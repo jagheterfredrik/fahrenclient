@@ -23,6 +23,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
   bool _isLoadingCharacteristic = false;
   bool? _isHeatingEnabled;
   String? _errorMessage;
+  bool _isWritingHeatingCharacteristic = false; // New state for heating button loading
   StreamSubscription? _scanSubscription; // Add a subscription for scan stream
   StreamSubscription? _batteryDataSubscription; // Subscription for battery data
   Completer<void>?
@@ -204,9 +205,17 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
   }
 
   // Callback function to handle characteristic value changes
-  void _handleValueChange(String deviceId, String characteristicId, Uint8List value) {
+  void _handleValueChange(
+    String deviceId,
+    String characteristicId,
+    Uint8List value,
+  ) {
     // print("Got data! $deviceId $characteristicId");
-    if (deviceId == widget.uuid && BleUuidParser.compareStrings(characteristicId, _batteryDataCharacteristicUuid)) {
+    if (deviceId == widget.uuid &&
+        BleUuidParser.compareStrings(
+          characteristicId,
+          _batteryDataCharacteristicUuid,
+        )) {
       setState(() {
         _batteryData = BatteryData.fromBytes(value);
       });
@@ -225,11 +234,6 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     } catch (e) {
       print('Error disconnecting: $e');
     }
-  }
-
-  // Clears the selected device ID from SharedPreferences and navigates back
-  Future<void> _clearSelectedDeviceId(BuildContext context) async {
-    Provider.of<DeviceState>(context, listen: false).clearSelectedDevice();
   }
 
   // Function to write the new manufacturer name to characteristic 0x1236
@@ -252,7 +256,10 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         _errorMessage = null; // Clear any previous error message
       });
       // Store the new name using DeviceState
-      Provider.of<DeviceState>(context, listen: false).setSelectedDevice(widget.uuid, newName);
+      Provider.of<DeviceState>(
+        context,
+        listen: false,
+      ).setSelectedDevice(widget.uuid, newName);
     } catch (e) {
       print('Error writing manufacturer name: $e');
       if (!mounted) return;
@@ -271,8 +278,9 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
       return;
     }
     try {
-      final Uint8List valueToWrite =
-          Uint8List.fromList([enableHeating ? 0x01 : 0x00]);
+      final Uint8List valueToWrite = Uint8List.fromList([
+        enableHeating ? 0x01 : 0x00,
+      ]);
       await UniversalBle.write(
         widget.uuid,
         _serviceUuid,
@@ -298,13 +306,6 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.deepPurple, // Set AppBar background color
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            _clearSelectedDeviceId(context);
-            // No need to navigate, main.dart will rebuild based on DeviceState
-          },
-        ),
         // Use deviceName for the AppBar title
         title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -323,6 +324,8 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
+                onEditingComplete: () =>
+                    _writeManufacturerName(_nameController.text),
               ),
             ),
             const SizedBox(width: 10),
@@ -331,9 +334,10 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         centerTitle: true,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.save, color: Colors.white),
-            onPressed: () => _writeManufacturerName(_nameController.text),
+          Icon(
+            _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+            color: _isConnected ? Colors.green : Colors.redAccent,
+            size: 24.0,
           ),
         ],
       ),
@@ -344,38 +348,13 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Moved connection status to the body
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-                    color: _isConnected ? Colors.green : Colors.redAccent,
-                    size: 24.0,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    _isConnected ? 'Connected' : 'Disconnected',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _isConnected ? Colors.green : Colors.redAccent,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20), // Add some spacing
-
               // Display connection and characteristic status
               _isLoadingCharacteristic
                   ? const Column(
                       children: [
                         CircularProgressIndicator(),
                         SizedBox(height: 16),
-                        Text(
-                          'Connecting...',
-                          textAlign: TextAlign.center,
-                        ),
+                        Text('Connecting...', textAlign: TextAlign.center),
                       ],
                     )
                   : _errorMessage != null
@@ -386,41 +365,105 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                     )
                   : Column(
                       children: [
-                        if (_isHeatingEnabled != null && _isConnected) // Add _isConnected condition
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        if (_isConnected)
+                          Column(
                             children: [
-                              const Text(
-                                'Heating Enabled:',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blueAccent,
-                                ),
-                              ),
-                              Switch(
+                               Switch(
                                 value: _isHeatingEnabled!,
                                 onChanged: (bool newValue) {
                                   _writeHeatingCharacteristic(newValue);
                                 },
-                                activeColor: _batteryData?.batteryHeatingActive == true ? Colors.green : Colors.grey,
+                                activeColor:
+                                    _batteryData?.batteryHeatingActive == true
+                                    ? Colors.green
+                                    : Colors.grey,
                                 inactiveThumbColor: Colors.red,
-                                inactiveTrackColor: _batteryData?.batteryHeatingActive == true ? Colors.green.withOpacity(0.5) : Colors.redAccent.withOpacity(0.5),
+                                inactiveTrackColor:
+                                    _batteryData?.batteryHeatingActive == true
+                                    ? Colors.green.withOpacity(0.5)
+                                    : Colors.redAccent.withOpacity(0.5),
                               ),
+                              ElevatedButton(
+                                onPressed: _isWritingHeatingCharacteristic ||
+                                        _isLoadingCharacteristic
+                                    ? null
+                                    : () => _writeHeatingCharacteristic(
+                                        !(_isHeatingEnabled ?? false)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _isHeatingEnabled == true
+                                      ? Colors.green
+                                      : Colors.red,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  textStyle: const TextStyle(fontSize: 16),
+                                ),
+                                child: _isWritingHeatingCharacteristic
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(
+                                        _isHeatingEnabled == true
+                                            ? 'Heating Enabled'
+                                            : 'Heating Disabled',
+                                      ),
+                              ),
+                              if (_errorMessage != null &&
+                                  _errorMessage!.contains('heating status'))
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: const TextStyle(
+                                        color: Colors.red, fontSize: 14),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
                             ],
                           )
-                        else if (!_isConnected) // Display message if disconnected
-                          const Text(
-                            'Device disconnected. Heating status unavailable.',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                            textAlign: TextAlign.center,
-                          )
-                        else // Original else for when _isHeatingEnabled is null but connected
-                          const Text(
-                            'Heating status not available.',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                            textAlign: TextAlign.center,
-                          ),
+                        else
+                          // Display message if disconnected
+                          ...[
+                            const Text(
+                              'Device disconnected. Heating status unavailable.',
+                              style:
+                                  TextStyle(fontSize: 16, color: Colors.grey),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12.0),
+                            ElevatedButton.icon(
+                              onPressed: _isLoadingCharacteristic
+                                  ? null
+                                  : _connectAndReadCharacteristic, // Disable if loading
+                              icon: const Icon(
+                                Icons.bluetooth_connected,
+                              ), // Icon for reconnect
+                              label: const Text(
+                                'Reconnect',
+                              ), // Label for reconnect button
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors
+                                    .blueAccent, // Different color for reconnect
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                textStyle: const TextStyle(fontSize: 16),
+                              ),
+                            ),
+                          ],
                       ],
                     ),
               // Display Battery Data
@@ -446,46 +489,50 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                         ),
                         const SizedBox(height: 10),
                         Text('BMS Mode: ${_batteryData!.bmsModeString}'),
-                        Text('Max Charge Power: ${(_batteryData!.maxChargePowerWatt * 0.1).toStringAsFixed(1)} W'),
-                        Text('Max Charge Current: ${(_batteryData!.maxChargeCurrentAmp * 0.2).toStringAsFixed(1)} A'),
-                        Text('Battery SOC: ${(_batteryData!.batterySOC * 0.05).toStringAsFixed(2)} %'),
-                        Text('Usable Energy: ${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh'),
-                        Text('Power Discharge: ${(_batteryData!.powerDischargePercentage * 0.2).toStringAsFixed(1)} %'),
-                        Text('Power Charge: ${(_batteryData!.powerChargePercentage * 0.2).toStringAsFixed(1)} %'),
-                        Text('Temp Status Charge: ${_batteryData!.temperatureStatusString}'),
-                        Text('Performance Index Charge Peak Temp: ${(_batteryData!.performanceIndexChargePeakTemperaturePercentage * 0.2).toStringAsFixed(1)} %'),
-                        Text('Battery Min Temp: ${((_batteryData!.batteryMinTemp * 0.5) - 40).toStringAsFixed(1)} °C'),
-                        Text('Battery Max Temp: ${((_batteryData!.batteryMaxTemp * 0.5) - 40).toStringAsFixed(1)} °C'),
-                        Text('Battery Heating Active: ${_batteryData!.batteryHeatingActive ? 'Yes' : 'No'}'),
-                        Text('Power Battery Heating: ${(_batteryData!.powerBatteryHeatingWatt).toStringAsFixed(0)} W'),
-                        Text('Power Battery Heating Req: ${(_batteryData!.powerBatteryHeatingReqWatt).toStringAsFixed(0)} W'),
+                        Text(
+                          'Max Charge Power: ${(_batteryData!.maxChargePowerWatt * 0.1).toStringAsFixed(1)} W',
+                        ),
+                        Text(
+                          'Max Charge Current: ${(_batteryData!.maxChargeCurrentAmp * 0.2).toStringAsFixed(1)} A',
+                        ),
+                        Text(
+                          'Battery SOC: ${(_batteryData!.batterySOC * 0.05).toStringAsFixed(2)} %',
+                        ),
+                        Text(
+                          'Usable Energy: ${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh',
+                        ),
+                        Text(
+                          'Power Discharge: ${(_batteryData!.powerDischargePercentage * 0.2).toStringAsFixed(1)} %',
+                        ),
+                        Text(
+                          'Power Charge: ${(_batteryData!.powerChargePercentage * 0.2).toStringAsFixed(1)} %',
+                        ),
+                        Text(
+                          'Temp Status Charge: ${_batteryData!.temperatureStatusString}',
+                        ),
+                        Text(
+                          'Performance Index Charge Peak Temp: ${(_batteryData!.performanceIndexChargePeakTemperaturePercentage * 0.2).toStringAsFixed(1)} %',
+                        ),
+                        Text(
+                          'Battery Min Temp: ${((_batteryData!.batteryMinTemp * 0.5) - 40).toStringAsFixed(1)} °C',
+                        ),
+                        Text(
+                          'Battery Max Temp: ${((_batteryData!.batteryMaxTemp * 0.5) - 40).toStringAsFixed(1)} °C',
+                        ),
+                        Text(
+                          'Battery Heating Active: ${_batteryData!.batteryHeatingActive ? 'Yes' : 'No'}',
+                        ),
+                        Text(
+                          'Power Battery Heating: ${(_batteryData!.powerBatteryHeatingWatt).toStringAsFixed(0)} W',
+                        ),
+                        Text(
+                          'Power Battery Heating Req: ${(_batteryData!.powerBatteryHeatingReqWatt).toStringAsFixed(0)} W',
+                        ),
                       ],
                     ),
                   ),
                 ),
-              const SizedBox(height: 12.0),
-              ElevatedButton.icon(
-                onPressed: _isLoadingCharacteristic
-                    ? null
-                    : _connectAndReadCharacteristic, // Disable if loading
-                icon: const Icon(
-                  Icons.bluetooth_connected,
-                ), // Icon for reconnect
-                label: const Text('Reconnect'), // Label for reconnect button
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      Colors.blueAccent, // Different color for reconnect
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: const TextStyle(fontSize: 16),
-                ),
-              ),
+
               const SizedBox(height: 6.0), // Add some spacing between buttons
             ],
           ),
@@ -494,3 +541,4 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     );
   }
 }
+

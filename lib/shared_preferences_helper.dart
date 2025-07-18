@@ -12,6 +12,7 @@ class SharedPreferencesHelper {
 
   static Future<Map<String, String?>> loadSelectedDevice() async {
     final prefs = await SharedPreferences.getInstance();
+    prefs.clear();
     final deviceId = prefs.getString(_kSelectedDeviceIdKey);
     final deviceName = prefs.getString(_kSelectedDeviceNameKey);
     return {

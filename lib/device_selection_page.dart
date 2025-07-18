@@ -71,6 +71,8 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
     });
 
     try {
+      List<BleDevice> devices = await UniversalBle.getSystemDevices(withServices: ['ABCD']);
+      _scannedDevices.addAll(devices);
       _scanSubscription = UniversalBle.scanStream.listen((scanResult) {
         setState(() {
           // Check if a device with the same deviceId already exists
@@ -82,12 +84,12 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
             _scannedDevices.add(scanResult);
           } else {
             // If found, update the existing device (e.g., if RSSI or other properties change)
-            _scannedDevices[existingIndex] = scanResult;
+            // _scannedDevices[existingIndex] = scanResult;
+            _scannedDevices[existingIndex].manufacturerDataList = scanResult.manufacturerDataList;
           }
         });
       });
 
-      // On web, filter by both service and name if remembered
       ScanFilter filter = ScanFilter(withServices: ['ABCD']);
       await UniversalBle.startScan(scanFilter: filter);
     } catch (e) {

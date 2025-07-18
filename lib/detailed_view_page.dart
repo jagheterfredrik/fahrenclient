@@ -23,7 +23,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
   bool _isLoadingCharacteristic = false;
   bool? _isHeatingEnabled;
   String? _errorMessage;
-  bool _isWritingHeatingCharacteristic = false; // New state for heating button loading
+  bool _isHeatingCharacteristicUpdating = false; // New state for heating characteristic update
   StreamSubscription? _scanSubscription; // Add a subscription for scan stream
   StreamSubscription? _batteryDataSubscription; // Subscription for battery data
   Completer<void>?
@@ -31,9 +31,9 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
   BatteryData? _batteryData; // To store the parsed battery data
 
   // Define the service and characteristic UUIDs
-  final String _serviceUuid = 'ABCD';
+  final String _serviceUuid = BleUuidParser.string('ABCD');
   final String _heatingCharacteristicUuid =
-      'DEAD'; // Characteristic for heating enabled (0 or 1)
+      BleUuidParser.string('DEAD'); // Characteristic for heating enabled (0 or 1)
   final String _manufacturerNameCharacteristicUuid =
       'F00D'; // New characteristic for manufacturer name
   final String _batteryDataCharacteristicUuid =
@@ -134,7 +134,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
       }
 
       // Attempt to connect to the device
-      await UniversalBle.connect(widget.uuid);
+      await UniversalBle.connect(widget.uuid, connectionTimeout: Duration(seconds: 10));
       if (!mounted) return;
       setState(() {
         _isConnected = true;
@@ -148,14 +148,14 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         ),
       );
 
-      // Read the original characteristic (1235)
+      await UniversalBle.discoverServices(widget.uuid);
+
       final Uint8List value = await UniversalBle.read(
         widget.uuid,
         _serviceUuid,
         _heatingCharacteristicUuid,
       );
 
-      // // Read the manufacturer name characteristic (1236)
       final Uint8List manufacturerNameValue = await UniversalBle.read(
         widget.uuid,
         _serviceUuid,
@@ -165,14 +165,22 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
       if (!mounted) return;
       setState(() {
         _isHeatingEnabled = value.isNotEmpty && value[0] == 0x01;
-        _nameController.text = utf8.decode(
-          manufacturerNameValue,
-        ); // Update name controller with read value
+        print(manufacturerNameValue);
+        try {
+          _nameController.text = utf8.decode(
+            manufacturerNameValue,
+          ); // Update name controller with read value
+        } catch (e) {
+          print("Name is fucked");
+        }
         _isLoadingCharacteristic = false;
       });
 
+      UniversalBle.onValueChange = _handleValueChange;
       // Subscribe to battery data characteristic after successful connection
       _subscribeToBatteryData();
+      // Subscribe to heating characteristic after successful connection
+      _subscribeToHeatingCharacteristic();
     } catch (e) {
       print('Error connecting or reading characteristic: $e');
       if (!mounted) return;
@@ -193,13 +201,30 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         _batteryDataCharacteristicUuid,
       );
 
-      UniversalBle.onValueChange = _handleValueChange;
       print('Subscribed to battery data characteristic.');
     } catch (e) {
       print('Error subscribing to battery data: $e');
       if (!mounted) return;
       setState(() {
         _errorMessage = 'Error subscribing to battery data: $e';
+      });
+    }
+  }
+
+  // Function to subscribe to heating characteristic
+  Future<void> _subscribeToHeatingCharacteristic() async {
+    try {
+      await UniversalBle.subscribeNotifications(
+        widget.uuid,
+        _serviceUuid,
+        _heatingCharacteristicUuid,
+      );
+      print('Subscribed to heating characteristic.');
+    } catch (e) {
+      print('Error subscribing to heating characteristic: $e');
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Error subscribing to heating characteristic: $e';
       });
     }
   }
@@ -218,6 +243,15 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         )) {
       setState(() {
         _batteryData = BatteryData.fromBytes(value);
+      });
+    } else if (deviceId == widget.uuid &&
+        BleUuidParser.compareStrings(
+          characteristicId,
+          _heatingCharacteristicUuid,
+        )) {
+      setState(() {
+        _isHeatingEnabled = value.isNotEmpty && value[0] == 0x01;
+        _isHeatingCharacteristicUpdating = false; // Reset loading state on notification
       });
     }
   }
@@ -277,6 +311,10 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
       });
       return;
     }
+    setState(() {
+      _isHeatingCharacteristicUpdating = true; // Set loading state to true
+      _errorMessage = null; // Clear any previous error message
+    });
     try {
       final Uint8List valueToWrite = Uint8List.fromList([
         enableHeating ? 0x01 : 0x00,
@@ -287,16 +325,15 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         _heatingCharacteristicUuid,
         valueToWrite,
       );
+      // Do NOT update _isHeatingEnabled here. Wait for notification.
       if (!mounted) return;
-      setState(() {
-        _isHeatingEnabled = enableHeating;
-        _errorMessage = null; // Clear any previous error message
-      });
+      // No setState here, wait for notification
     } catch (e) {
       print('Error writing heating characteristic: $e');
       if (!mounted) return;
       setState(() {
         _errorMessage = 'Error writing heating status: $e';
+        _isHeatingCharacteristicUpdating = false; // Reset loading state on error
       });
     }
   }
@@ -357,34 +394,22 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                         Text('Connecting...', textAlign: TextAlign.center),
                       ],
                     )
-                  : _errorMessage != null
-                  ? Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: Colors.red, fontSize: 16),
-                      textAlign: TextAlign.center,
-                    )
                   : Column(
                       children: [
+                        if (_errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(color: Colors.red, fontSize: 16),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         if (_isConnected)
                           Column(
                             children: [
-                               Switch(
-                                value: _isHeatingEnabled!,
-                                onChanged: (bool newValue) {
-                                  _writeHeatingCharacteristic(newValue);
-                                },
-                                activeColor:
-                                    _batteryData?.batteryHeatingActive == true
-                                    ? Colors.green
-                                    : Colors.grey,
-                                inactiveThumbColor: Colors.red,
-                                inactiveTrackColor:
-                                    _batteryData?.batteryHeatingActive == true
-                                    ? Colors.green.withOpacity(0.5)
-                                    : Colors.redAccent.withOpacity(0.5),
-                              ),
                               ElevatedButton(
-                                onPressed: _isWritingHeatingCharacteristic ||
+                                onPressed: _isHeatingCharacteristicUpdating ||
                                         _isLoadingCharacteristic
                                     ? null
                                     : () => _writeHeatingCharacteristic(
@@ -401,7 +426,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                                   ),
                                   textStyle: const TextStyle(fontSize: 16),
                                 ),
-                                child: _isWritingHeatingCharacteristic
+                                child: _isHeatingCharacteristicUpdating
                                     ? const SizedBox(
                                         width: 20,
                                         height: 20,
@@ -416,24 +441,12 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                                             : 'Heating Disabled',
                                       ),
                               ),
-                              if (_errorMessage != null &&
-                                  _errorMessage!.contains('heating status'))
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(
-                                        color: Colors.red, fontSize: 14),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
                             ],
                           )
-                        else
-                          // Display message if disconnected
+                        else // Display message and reconnect button if disconnected or error
                           ...[
                             const Text(
-                              'Device disconnected. Heating status unavailable.',
+                              'Device disconnected or connection failed.',
                               style:
                                   TextStyle(fontSize: 16, color: Colors.grey),
                               textAlign: TextAlign.center,
@@ -461,10 +474,10 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 textStyle: const TextStyle(fontSize: 16),
-                              ),
-                            ),
-                          ],
-                      ],
+                               ),
+                             ),
+                           ],
+                       ],
                     ),
               // Display Battery Data
               if (_batteryData != null)
@@ -490,7 +503,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                         const SizedBox(height: 10),
                         Text('BMS Mode: ${_batteryData!.bmsModeString}'),
                         Text(
-                          'Max Charge Power: ${(_batteryData!.maxChargePowerWatt * 0.1).toStringAsFixed(1)} W',
+                          'Max Charge Power: ${(_batteryData!.maxChargePowerWatt * .1).toStringAsFixed(1)} kW',
                         ),
                         Text(
                           'Max Charge Current: ${(_batteryData!.maxChargeCurrentAmp * 0.2).toStringAsFixed(1)} A',
@@ -502,31 +515,19 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                           'Usable Energy: ${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh',
                         ),
                         Text(
-                          'Power Discharge: ${(_batteryData!.powerDischargePercentage * 0.2).toStringAsFixed(1)} %',
-                        ),
-                        Text(
-                          'Power Charge: ${(_batteryData!.powerChargePercentage * 0.2).toStringAsFixed(1)} %',
-                        ),
-                        Text(
                           'Temp Status Charge: ${_batteryData!.temperatureStatusString}',
                         ),
                         Text(
-                          'Performance Index Charge Peak Temp: ${(_batteryData!.performanceIndexChargePeakTemperaturePercentage * 0.2).toStringAsFixed(1)} %',
+                          'Performance Index: ${(_batteryData!.performanceIndexChargePeakTemperaturePercentage * 0.2).toStringAsFixed(1)} %',
                         ),
                         Text(
-                          'Battery Min Temp: ${((_batteryData!.batteryMinTemp * 0.5) - 40).toStringAsFixed(1)} °C',
-                        ),
-                        Text(
-                          'Battery Max Temp: ${((_batteryData!.batteryMaxTemp * 0.5) - 40).toStringAsFixed(1)} °C',
+                          'Battery Min/Max Temp: ${((_batteryData!.batteryMinTemp * 0.5) - 40).toStringAsFixed(1)} °C / ${((_batteryData!.batteryMaxTemp * 0.5) - 40).toStringAsFixed(1)} °C'
                         ),
                         Text(
                           'Battery Heating Active: ${_batteryData!.batteryHeatingActive ? 'Yes' : 'No'}',
                         ),
                         Text(
-                          'Power Battery Heating: ${(_batteryData!.powerBatteryHeatingWatt).toStringAsFixed(0)} W',
-                        ),
-                        Text(
-                          'Power Battery Heating Req: ${(_batteryData!.powerBatteryHeatingReqWatt).toStringAsFixed(0)} W',
+                          'Battery Heater Power: ${(_batteryData!.powerBatteryHeatingWatt.toDouble()/1.06).toStringAsFixed(1)}% / ${(_batteryData!.powerBatteryHeatingReqWatt.toDouble()/1.06).toStringAsFixed(1)}%'
                         ),
                       ],
                     ),

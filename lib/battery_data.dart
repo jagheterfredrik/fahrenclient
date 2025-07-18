@@ -6,8 +6,6 @@ class BatteryData {
   final int maxChargeCurrentAmp; // uint16_t, X * 0.2
   final int batterySOC; // uint16_t, X * 0.05
   final int usableEnergyAmountWh; // uint16_t, X * 5
-  final int powerDischargePercentage; // uint16_t, X * 0.2
-  final int powerChargePercentage; // uint16_t, X * 0.2
   final int temperatureStatusCharge; // uint8_t
   final int performanceIndexChargePeakTemperaturePercentage; // uint16_t, X * 0.2
   final int batteryMinTemp; // uint8_t, X * 0.5 - 40
@@ -22,8 +20,6 @@ class BatteryData {
     required this.maxChargeCurrentAmp,
     required this.batterySOC,
     required this.usableEnergyAmountWh,
-    required this.powerDischargePercentage,
-    required this.powerChargePercentage,
     required this.temperatureStatusCharge,
     required this.performanceIndexChargePeakTemperaturePercentage,
     required this.batteryMinTemp,
@@ -45,10 +41,6 @@ class BatteryData {
     final int batterySOC = byteData.getUint16(offset, Endian.little);
     offset += 2;
     final int usableEnergyAmountWh = byteData.getUint16(offset, Endian.little);
-    offset += 2;
-    final int powerDischargePercentage = byteData.getUint16(offset, Endian.little);
-    offset += 2;
-    final int powerChargePercentage = byteData.getUint16(offset, Endian.little);
     offset += 2;
     final int temperatureStatusCharge = byteData.getUint8(offset);
     offset += 1;
@@ -72,8 +64,6 @@ class BatteryData {
       maxChargeCurrentAmp: maxChargeCurrentAmp,
       batterySOC: batterySOC,
       usableEnergyAmountWh: usableEnergyAmountWh,
-      powerDischargePercentage: powerDischargePercentage,
-      powerChargePercentage: powerChargePercentage,
       temperatureStatusCharge: temperatureStatusCharge,
       performanceIndexChargePeakTemperaturePercentage:
           performanceIndexChargePeakTemperaturePercentage,

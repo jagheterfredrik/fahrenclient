@@ -502,6 +502,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                         ),
                         const SizedBox(height: 10),
                         Text('BMS Mode: ${_batteryData!.bmsModeString}'),
+                        Text('BMS Power: ${((_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100).toStringAsFixed(0)} W'),
                         Text(
                           'Max Charge Power: ${(_batteryData!.maxChargePowerWatt * .1).toStringAsFixed(1)} kW',
                         ),
@@ -522,6 +523,9 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                         ),
                         Text(
                           'Battery Min/Max Temp: ${((_batteryData!.batteryMinTemp * 0.5) - 40).toStringAsFixed(1)} °C / ${((_batteryData!.batteryMaxTemp * 0.5) - 40).toStringAsFixed(1)} °C'
+                        ),
+                        Text(
+                          'Battery Min/Max/Delta Volt: ${(_batteryData!.cellVoltageMin + 1000)} mV / ${(_batteryData!.cellVoltageMax + 1000)} mV / ${_batteryData!.cellVoltageMax - _batteryData!.cellVoltageMin} mV'
                         ),
                         Text(
                           'Battery Heating Active: ${_batteryData!.batteryHeatingActive ? 'Yes' : 'No'}',

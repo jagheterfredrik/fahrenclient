@@ -3,7 +3,6 @@
 import 'dart:async';
 import 'dart:typed_data'; // For Uint8List
 import 'dart:convert'; // For utf8.decode
-import 'dart:typed_data'; // For Uint8List
 import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';

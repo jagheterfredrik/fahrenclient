@@ -83,9 +83,9 @@ class MyApp extends StatelessWidget {
       title: 'Fahrenheat App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark, // Dark theme
-        primarySwatch: Colors.green,
-        scaffoldBackgroundColor: const Color(0xFF1C1C1E), // Dark background
+        // brightness: Brightness.dark, // Dark theme
+        // primarySwatch: Colors.green,
+        scaffoldBackgroundColor: const Color(0xFF1C1C1E),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -98,7 +98,7 @@ class MyApp extends StatelessWidget {
           titleMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
           labelLarge: TextStyle(color: Colors.white),
         ),
-        cardColor: const Color(0xFF2C2C2E), // Card background
+        cardTheme:  CardTheme.of(context).copyWith(color: const Color(0xFF2C2C2E)),
         // Define button themes for a modern look
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(

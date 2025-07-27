@@ -85,9 +85,10 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
   @override
   void dispose() {
     _nameController.dispose(); // Dispose the controller
-    _disconnect();
+    _disconnect(); // Ensure disconnection when navigating away
     _batteryDataSubscription?.cancel(); // Cancel battery data subscription
     UniversalBle.onValueChange = null; // Clear the callback when disposing
+    _stopScan(); // Ensure any ongoing scan is stopped
     super.dispose();
   }
 
@@ -236,9 +237,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
         _serviceUuid,
         _heatingCharacteristicUuid,
       );
-      print('Subscribed to heating characteristic.');
     } catch (e) {
-      print('Error subscribing to heating characteristic: $e');
       if (!mounted) return;
       setState(() {
         _errorMessage = 'Error subscribing to heating characteristic: $e';
@@ -312,7 +311,6 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
         listen: false,
       ).setSelectedDevice(widget.uuid, newName);
     } catch (e) {
-      print('Error writing manufacturer name: $e');
       if (!mounted) return;
       setState(() {
         _errorMessage = 'Error writing name: $e';
@@ -346,7 +344,6 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
       if (!mounted) return;
       // No setState here, wait for notification
     } catch (e) {
-      print('Error writing heating characteristic: $e');
       if (!mounted) return;
       setState(() {
         _errorMessage = 'Error writing heating status: $e';
@@ -478,12 +475,19 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                                 children: [
                                   Text(
                                     _batteryData != null
-                                        ? ((_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100).toStringAsFixed(0)
-                                        : 'N/A',
+                                        ? (() {
+                                              double power = (_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100;
+                                              if (power.abs() < 1000) {
+                                                return '${power.toStringAsFixed(0)}';
+                                              } else {
+                                                return '${(power / 1000).toStringAsFixed(2)}';
+                                              }
+                                            })()
+                                          : 'N/A',
                                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 48),
                                   ),
                                   Text(
-                                    'kW',
+                                    ((_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100).abs() < 1000 ? 'W' : 'kW',
                                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 20),
                                   ),
                                 ],
@@ -779,7 +783,8 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
     int requested,
   ) {
     return Card(
-      elevation: 0,
+      // elevation: 0,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -811,11 +816,11 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Duty\n${duty}%',
+                  'Duty\n$duty%',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Text(
-                  'Requested\n${requested}%',
+                  'Requested\n$requested%',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
                   textAlign: TextAlign.right,
                 ),

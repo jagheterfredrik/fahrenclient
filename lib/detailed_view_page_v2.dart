@@ -38,6 +38,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
   Completer<void>?
   _deviceFoundCompleter; // Completer to signal when device is found
   BatteryData? _batteryData; // To store the parsed battery data
+  bool _showUsableEnergy = false; // New state to toggle display
 
   // Define the service and characteristic UUIDs
   final String _serviceUuid = BleUuidParser.string('ABCD');
@@ -506,56 +507,41 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 10),
-                            SizedBox(
-                              width: 100,
-                              height: 100,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 90,
-                                    height: 90,
-                                    child: CircularProgressIndicator(
-                                      value: _batteryData != null ? (_batteryData!.batterySOC * 0.05) / 100 : 0.0,
-                                      strokeWidth: 8,
-                                      backgroundColor: Colors.grey[800],
-                                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _showUsableEnergy = !_showUsableEnergy;
+                                });
+                              },
+                              child: SizedBox(
+                                width: 100,
+                                height: 100,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 90,
+                                      height: 90,
+                                      child: CircularProgressIndicator(
+                                        value: _batteryData != null ? (_batteryData!.batterySOC * 0.05) / 100 : 0.0,
+                                        strokeWidth: 8,
+                                        backgroundColor: Colors.grey[800],
+                                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    _batteryData != null
-                                        ? '${(_batteryData!.batterySOC * 0.05).toStringAsFixed(0)}%'
-                                        : 'N/A',
-                                    style: Theme.of(context).textTheme.titleMedium,
-                                  ),
-                                ],
+                                    Text(
+                                      _batteryData != null
+                                          ? (_showUsableEnergy
+                                              ? '${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh'
+                                              : '${(_batteryData!.batterySOC * 0.05).toStringAsFixed(0)}%')
+                                          : 'N/A',
+                                      style: _showUsableEnergy ? Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 12) : Theme.of(context).textTheme.titleMedium,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Voltage and Temperature Section
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildVoltageCard(
-                          context,
-                          _batteryData?.cellVoltageMin ?? 0,
-                          _batteryData?.cellVoltageMax ?? 0,
-                          0.6, // This value is hardcoded in the original, might need adjustment
-                          Colors.orange,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildTemperatureCard(
-                          context,
-                          ((_batteryData?.batteryMinTemp ?? 0) * 0.5) - 40,
-                          ((_batteryData?.batteryMaxTemp ?? 0) * 0.5) - 40,
                         ),
                       ),
                     ],
@@ -585,6 +571,30 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                     ],
                   ),
                   const SizedBox(height: 20), // Space before the new button
+
+                  // Voltage and Temperature Section
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildVoltageCard(
+                          context,
+                          _batteryData?.cellVoltageMin ?? 0,
+                          _batteryData?.cellVoltageMax ?? 0,
+                          0.6, // This value is hardcoded in the original, might need adjustment
+                          Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildTemperatureCard(
+                          context,
+                          ((_batteryData?.batteryMinTemp ?? 0) * 0.5) - 40,
+                          ((_batteryData?.batteryMaxTemp ?? 0) * 0.5) - 40,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
 
                   // New: Enable Battery Heater Button
                   Center(

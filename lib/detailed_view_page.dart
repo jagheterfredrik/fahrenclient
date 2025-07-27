@@ -11,8 +11,14 @@ import 'package:universal_ble/universal_ble.dart';
 class DetailedViewPage extends StatefulWidget {
   final String uuid; // The UUID to display
   final String? deviceName; // New: Optional device name
+  final BatteryData? demoBatteryData; // New: Optional demo battery data
 
-  const DetailedViewPage({super.key, required this.uuid, this.deviceName});
+  const DetailedViewPage({
+    super.key,
+    required this.uuid,
+    this.deviceName,
+    this.demoBatteryData, // Add to constructor
+  });
 
   @override
   _DetailedViewPageState createState() => _DetailedViewPageState();
@@ -49,19 +55,29 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     _nameController = TextEditingController(
       text: widget.deviceName,
     ); // Initialize with passed device name
-    _connectAndReadCharacteristic();
 
-    // Listen to connection stream to update status dynamically
-    UniversalBle.connectionStream(widget.uuid).listen((bool isConnected) {
-      debugPrint('Is device ${widget.uuid} connected?: $isConnected');
-      if (!mounted) return;
+    if (widget.demoBatteryData != null) {
+      // If in demo mode, use the provided static data
       setState(() {
-        _isConnected = isConnected;
-        if (!isConnected) {
-          _batteryData = null; // Clear battery data if disconnected
-        }
+        _batteryData = widget.demoBatteryData;
+        _isConnected = true; // Simulate connected state for demo
       });
-    });
+    } else {
+      // Otherwise, proceed with BLE connection
+      _connectAndReadCharacteristic();
+
+      // Listen to connection stream to update status dynamically
+      UniversalBle.connectionStream(widget.uuid).listen((bool isConnected) {
+        debugPrint('Is device ${widget.uuid} connected?: $isConnected');
+        if (!mounted) return;
+        setState(() {
+          _isConnected = isConnected;
+          if (!isConnected) {
+            _batteryData = null; // Clear battery data if disconnected
+          }
+        });
+      });
+    }
   }
 
   @override

@@ -1,12 +1,15 @@
 
 // This is the new onboarding page for device selection.
 import 'dart:async';
+import 'dart:typed_data'; // For Uint8List
 import 'dart:convert'; // For utf8.decode
+import 'dart:typed_data'; // For Uint8List
 import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
 import 'package:fahrenclient/shared_preferences_helper.dart'; // Import the new helper
 import 'package:fahrenclient/detailed_view_page.dart'; // Import DetailedViewPage
+import 'package:fahrenclient/battery_data.dart'; // Import BatteryData
 
 class DeviceSelectionPage extends StatefulWidget {
   final String? rememberedDeviceName;
@@ -244,7 +247,51 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24.0),
+            child: ElevatedButton.icon(
+              onPressed: _startDemoMode,
+              label: const Text('Demo Mode'),
+              icon: const Icon(Icons.developer_mode, color: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30.0),
+                ),
+                elevation: 5,
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  void _startDemoMode() {
+    // Static hex string for demo data
+    const String demoHexString = '04983FF405C20147021706842E01F40182849F0B960B000000';
+
+    // Convert hex string to Uint8List
+    Uint8List demoBytes = Uint8List.fromList(
+      List.generate(demoHexString.length ~/ 2, (i) {
+        return int.parse(demoHexString.substring(i * 2, i * 2 + 2), radix: 16);
+      }),
+    );
+
+    // Create BatteryData object from demo bytes
+    final BatteryData demoBatteryData = BatteryData.fromBytes(demoBytes);
+
+    // Navigate to DetailedViewPage with demo data
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DetailedViewPage(
+          uuid: 'DEMO_UUID', // Placeholder UUID for demo mode
+          deviceName: 'Demo Device', // Name for demo mode
+          demoBatteryData: demoBatteryData, // Pass the demo data
+        ),
       ),
     );
   }

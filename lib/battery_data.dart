@@ -119,6 +119,29 @@ class BatteryData {
       case 0:
         return 'Invalid';
       case 1:
+        return 'Ready';
+      case 2:
+        return 'Balancing';
+      case 3:
+        return 'Charging';
+      case 4:
+        return 'AC Charging';
+      case 5:
+        return 'Error';
+      case 6:
+        return 'DC Charging';
+      case 7:
+        return 'Initializing';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  String get bmsModeDetailedString {
+    switch (bmsMode) {
+      case 0:
+        return 'Invalid';
+      case 1:
         return 'HV_ACTIVE';
       case 2:
         return 'BALANCING';

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // Import provider
 import 'package:fahrenclient/device_state.dart'; // Import DeviceState
 import 'package:fahrenclient/device_selection_page.dart'; // Import DeviceSelectionPage
-import 'package:fahrenclient/detailed_view_page.dart'; // Import DetailedViewPage
+import 'package:fahrenclient/detailed_view_page_v2.dart'; // Import DetailedViewPageV3
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io' show Platform;
 
@@ -83,8 +83,45 @@ class MyApp extends StatelessWidget {
       title: 'Fahrenheat App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.deepPurple,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+        brightness: Brightness.dark, // Dark theme
+        primarySwatch: Colors.green,
+        scaffoldBackgroundColor: const Color(0xFF1C1C1E), // Dark background
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: false,
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white70),
+          titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          titleMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+          labelLarge: TextStyle(color: Colors.white),
+        ),
+        cardColor: const Color(0xFF2C2C2E), // Card background
+        // Define button themes for a modern look
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green, // Button background color
+            foregroundColor: Colors.white, // Button text color
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12), // Rounded corners for buttons
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Colors.green), // Border color
+            foregroundColor: Colors.green, // Text color
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12), // Rounded corners
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
       ),
       home: Consumer<DeviceState>(
         builder: (context, deviceState, child) {
@@ -92,8 +129,7 @@ class MyApp extends StatelessWidget {
             // If no device is selected and not loading, show DeviceSelectionPage
             return DeviceSelectionPage();
           } else if (deviceState.selectedDeviceId != null) {
-            // If a device is selected, show DetailedViewPage
-            return DetailedViewPage(
+            return DetailedViewPageV2(
               uuid: deviceState.selectedDeviceId!,
               deviceName: deviceState.selectedDeviceName,
             );

@@ -96,7 +96,7 @@ class BatteryData {
   }
 
   // Helper to get temperature status string
-  String get temperatureStatusString {
+  String get temperatureStatusDetailedString {
     switch (temperatureStatusCharge) {
       case 0:
         return 'Init';
@@ -108,6 +108,19 @@ class BatteryData {
         return 'Temp Over Optimal';
       case 7:
         return 'Fault';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  String get temperatureStatusString {
+    switch (temperatureStatusCharge) {
+      case 1:
+        return 'Suboptimal';
+      case 2:
+        return 'Optimal';
+      case 3:
+        return 'Hot';
       default:
         return 'Unknown';
     }

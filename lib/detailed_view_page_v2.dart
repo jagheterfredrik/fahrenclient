@@ -588,6 +588,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                       Expanded(
                         child: _buildTemperatureCard(
                           context,
+                          _batteryData?.temperatureStatusString ?? "Unknown",
                           ((_batteryData?.batteryMinTemp ?? 0) * 0.5) - 40,
                           ((_batteryData?.batteryMaxTemp ?? 0) * 0.5) - 40,
                         ),
@@ -654,7 +655,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                 const SizedBox(width: 8),
                 Text(
                   'Δ ${maxValue - minValue} mV',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 28),
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
             ),
@@ -683,6 +684,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
   // Helper widget to build temperature cards
   Widget _buildTemperatureCard(
     BuildContext context,
+    String status,
     double minValue,
     double maxValue,
   ) {
@@ -704,8 +706,8 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                 Icon(Icons.thermostat, color: Colors.green),
                 const SizedBox(width: 8),
                 Text(
-                  '${minValue.toStringAsFixed(1)}°C',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 28),
+                  status,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
             ),
@@ -714,8 +716,13 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
+                  'Min\n${minValue.toStringAsFixed(1)}°C',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                ),
+                Text(
                   'Δ\n${(maxValue - minValue).toStringAsFixed(1)}°C',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  textAlign: TextAlign.center,
                 ),
                 Text(
                   'Max\n${maxValue.toStringAsFixed(1)}°C',

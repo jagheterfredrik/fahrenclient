@@ -485,7 +485,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                                               }
                                             })()
                                           : 'N/A',
-                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 48),
+                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 36),
                                   ),
                                   Text(
                                     ((_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100).abs() < 1000 ? 'W' : 'kW',
@@ -535,7 +535,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                                               ? '${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh'
                                               : '${(_batteryData!.batterySOC * 0.05).toStringAsFixed(0)}%')
                                           : 'N/A',
-                                      style: _showUsableEnergy ? Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 12) : Theme.of(context).textTheme.titleMedium,
+                                      style: _showUsableEnergy ? Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 12) : Theme.of(context).textTheme.titleLarge,
                                     ),
                                   ],
                                 ),
@@ -546,7 +546,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // New: Charging Information and Battery Heater Information Section
                   Row(
@@ -559,7 +559,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                           (_batteryData?.maxChargeCurrentAmp ?? 0) * 0.2,
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _buildBatteryHeaterCard(
                           context,
@@ -570,7 +570,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20), // Space before the new button
+                  const SizedBox(height: 10), // Space before the new button
 
                   // Voltage and Temperature Section
                   Row(
@@ -584,7 +584,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                           Colors.orange,
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _buildTemperatureCard(
                           context,
@@ -595,7 +595,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
                   // New: Enable Battery Heater Button
                   Center(
@@ -652,7 +652,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
             Row(
               children: [
                 const Icon(Icons.battery_full, color: Colors.green),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 Text(
                   'Δ ${maxValue - minValue} mV',
                   style: Theme.of(context).textTheme.titleMedium,
@@ -704,7 +704,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
             Row(
               children: [
                 Icon(Icons.thermostat, color: Colors.green),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 Text(
                   status,
                   style: Theme.of(context).textTheme.titleMedium,
@@ -718,11 +718,6 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
                 Text(
                   'Min\n${minValue.toStringAsFixed(1)}°C',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
-                ),
-                Text(
-                  'Δ\n${(maxValue - minValue).toStringAsFixed(1)}°C',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
-                  textAlign: TextAlign.center,
                 ),
                 Text(
                   'Max\n${maxValue.toStringAsFixed(1)}°C',
@@ -760,7 +755,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
             Row(
               children: [
                 Icon(Icons.battery_charging_full, color: Colors.green),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -816,7 +811,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
             Row(
               children: [
                 Icon(Icons.fireplace, color: Colors.green),
-                const SizedBox(width: 8),
+                const SizedBox(width: 7),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

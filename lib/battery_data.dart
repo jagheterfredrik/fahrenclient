@@ -130,7 +130,7 @@ class BatteryData {
   String get bmsModeString {
     switch (bmsMode) {
       case 0:
-        return 'Invalid';
+        return 'Off';
       case 1:
         return 'Ready';
       case 2:

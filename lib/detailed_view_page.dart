@@ -6,21 +6,21 @@ import 'dart:convert';
 import 'package:fahrenclient/battery_data.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Import provider
-import 'package:fahrenclient/device_state.dart'; // Import DeviceState
+import 'package:provider/provider.dart';
+import 'package:fahrenclient/device_state.dart';
 import 'package:fahrenclient/device_selection_page.dart';
 import 'package:universal_ble/universal_ble.dart';
 
 class DetailedViewPage extends StatefulWidget {
-  final String uuid; // The UUID to display
-  final String? deviceName; // New: Optional device name
-  final BatteryData? demoBatteryData; // New: Optional demo battery data
+  final String uuid;
+  final String? deviceName;
+  final BatteryData? demoBatteryData;
 
   const DetailedViewPage({
     super.key,
     required this.uuid,
     this.deviceName,
-    this.demoBatteryData, // Add to constructor
+    this.demoBatteryData,
   });
 
   @override
@@ -31,51 +31,49 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
   bool _isConnected = false;
   bool _isLoadingCharacteristic = false;
   bool? _isHeatingEnabled;
-  bool _isHeatingCharacteristicUpdating = false; // New state for heating characteristic update
-  StreamSubscription? _scanSubscription; // Add a subscription for scan stream
-  StreamSubscription? _batteryDataSubscription; // Subscription for battery data
-  Completer<void>?
-  _deviceFoundCompleter; // Completer to signal when device is found
-  BatteryData? _batteryData; // To store the parsed battery data
-  bool _showUsableEnergy = false; // New state to toggle display
+  bool _isHeatingCharacteristicUpdating = false;
+  StreamSubscription? _scanSubscription;
+  StreamSubscription? _batteryDataSubscription;
+  Completer<void>? _deviceFoundCompleter;
+  BatteryData? _batteryData;
+  bool _showUsableEnergy = false;
+  ScaffoldMessengerState? _scaffoldMessengerState;
 
-  // Define the service and characteristic UUIDs
   final String _serviceUuid = BleUuidParser.string('ABCD');
   final String _heatingCharacteristicUuid =
-      BleUuidParser.string('DEAD'); // Characteristic for heating enabled (0 or 1)
+      BleUuidParser.string('DEAD');
   final String _manufacturerNameCharacteristicUuid =
-      'F00D'; // New characteristic for manufacturer name
+      'F00D';
   final String _batteryDataCharacteristicUuid =
-      'BABE'; // Characteristic for battery data notifications
+      'BABE';
 
   late TextEditingController
-  _nameController; // Controller for the editable name field
+  _nameController;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(
       text: widget.deviceName,
-    ); // Initialize with passed device name
+    );
 
     if (widget.demoBatteryData != null) {
-      // If in demo mode, use the provided static data
+      // Use static data in demo mode
       setState(() {
         _batteryData = widget.demoBatteryData;
-        _isConnected = true; // Simulate connected state for demo
+        _isConnected = true;
       });
     } else {
-      // Otherwise, proceed with BLE connection
+      // Proceed with BLE connection
       _connectAndReadCharacteristic();
-
-      // Listen to connection stream to update status dynamically
+    
+      // Listen to the connection stream to update the UI
       UniversalBle.connectionStream(widget.uuid).listen((bool isConnected) {
-        debugPrint('Is device ${widget.uuid} connected?: $isConnected');
         if (!mounted) return;
         setState(() {
           _isConnected = isConnected;
           if (!isConnected) {
-            _batteryData = null; // Clear battery data if disconnected
+            _batteryData = null;
           }
         });
       });
@@ -83,12 +81,21 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scaffoldMessengerState = ScaffoldMessenger.of(context);
+  }
+
+  @override
   void dispose() {
-    _nameController.dispose(); // Dispose the controller
-    _disconnect(); // Ensure disconnection when navigating away
-    _batteryDataSubscription?.cancel(); // Cancel battery data subscription
-    UniversalBle.onValueChange = null; // Clear the callback when disposing
-    _stopScan(); // Ensure any ongoing scan is stopped
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scaffoldMessengerState?.removeCurrentSnackBar();
+    });
+    _nameController.dispose();
+    _disconnect();
+    _batteryDataSubscription?.cancel();
+    UniversalBle.onValueChange = null;
+    _stopScan();
     super.dispose();
   }
 
@@ -106,17 +113,16 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     );
   }
 
-  // Helper to stop any ongoing scan
   void _stopScan() async {
     _scanSubscription?.cancel();
     _scanSubscription = null;
     if (_deviceFoundCompleter != null && !_deviceFoundCompleter!.isCompleted) {
-      _deviceFoundCompleter!.complete(); // Complete if not already completed
+      _deviceFoundCompleter!.complete();
     }
     await UniversalBle.stopScan();
   }
 
-  // Connects to the device and reads the characteristic
+  // Connects to the device, discovers services, and reads characteristics.
   Future<void> _connectAndReadCharacteristic() async {
     if (!mounted) return;
 
@@ -125,20 +131,18 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     });
 
     try {
-      // For iOS, perform a scan before connecting to a known device
+      // On iOS, a scan is required to connect to a known device.
       if (defaultTargetPlatform == TargetPlatform.iOS) {
-        print('iOS detected: Starting scan for known device ${widget.uuid}');
         BleDevice? foundDevice;
-        _stopScan(); // Ensure no previous scan is running
-        _deviceFoundCompleter = Completer<void>(); // Initialize completer
+        _stopScan();
+        _deviceFoundCompleter = Completer<void>();
 
         _scanSubscription = UniversalBle.scanStream.listen((scanResult) {
           if (scanResult.deviceId == widget.uuid) {
             foundDevice = scanResult;
-            _stopScan(); // Stop scan once device is found
-            print('Found device ${widget.uuid} during scan.');
+            _stopScan();
             if (!_deviceFoundCompleter!.isCompleted) {
-              _deviceFoundCompleter!.complete(); // Signal that device is found
+              _deviceFoundCompleter!.complete();
             }
           }
         });
@@ -147,16 +151,15 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
           scanFilter: ScanFilter(withServices: [_serviceUuid]),
         );
 
-        // Wait for the device to be found or timeout
+        // Wait for the device to be found, with a timeout.
         await _deviceFoundCompleter!.future.timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            print('Scan timed out after 10 seconds.');
-            return; // Do nothing on timeout, foundDevice will remain null
+            return;
           },
         );
 
-        _stopScan(); // Ensure scan is stopped after finding device or timeout
+        _stopScan();
 
         if (foundDevice == null) {
           throw Exception(
@@ -165,7 +168,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         }
       }
 
-      // Attempt to connect to the device
+      // Connect to the device.
       await UniversalBle.connect(widget.uuid,
           connectionTimeout: const Duration(seconds: 10));
       if (!mounted) return;
@@ -173,7 +176,6 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         _isConnected = true;
       });
     } catch (e) {
-      print('Error connecting to device: $e');
       if (!mounted) return;
       _showErrorSnackbar('Could not connect to device.');
       setState(() {
@@ -212,20 +214,18 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         try {
           _nameController.text = utf8.decode(
             manufacturerNameValue,
-          ); // Update name controller with read value
+          );
         } catch (e) {
-          print("Name is fucked");
+          // Ignore errors decoding the manufacturer name.
         }
         _isLoadingCharacteristic = false;
       });
 
       UniversalBle.onValueChange = _handleValueChange;
-      // Subscribe to battery data characteristic after successful connection
+      
       await _subscribeToBatteryData();
-      // Subscribe to heating characteristic after successful connection
       await _subscribeToHeatingCharacteristic();
     } catch (e) {
-      print('Error reading/subscribing to characteristic: $e');
       if (!mounted) return;
       _showErrorSnackbar(
           'Could not read or subscribe to characteristic. ($e)');
@@ -236,7 +236,6 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     }
   }
 
-  // Function to subscribe to battery data characteristic
   Future<void> _subscribeToBatteryData() async {
     await UniversalBle.subscribeNotifications(
       widget.uuid,
@@ -244,10 +243,8 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
       _batteryDataCharacteristicUuid,
     );
 
-    print('Subscribed to battery data characteristic.');
   }
 
-  // Function to subscribe to heating characteristic
   Future<void> _subscribeToHeatingCharacteristic() async {
     await UniversalBle.subscribeNotifications(
       widget.uuid,
@@ -256,13 +253,12 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     );
   }
 
-  // Callback function to handle characteristic value changes
+  // Handles characteristic value changes from the BLE device.
   void _handleValueChange(
     String deviceId,
     String characteristicId,
     Uint8List value,
   ) {
-    // print("Got data! $deviceId $characteristicId");
     if (deviceId == widget.uuid &&
         BleUuidParser.compareStrings(
           characteristicId,
@@ -278,26 +274,25 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         )) {
       setState(() {
         _isHeatingEnabled = value.isNotEmpty && value[0] == 0x01;
-        _isHeatingCharacteristicUpdating = false; // Reset loading state on notification
+        _isHeatingCharacteristicUpdating = false;
       });
     }
   }
 
-  // Disconnects from the device
+  // Disconnects from the BLE device.
   Future<void> _disconnect() async {
     try {
       await UniversalBle.disconnect(widget.uuid);
-      if (!mounted) return; // Check mounted before calling setState
+      if (!mounted) return;
       setState(() {
         _isConnected = false;
-        _batteryData = null; // Clear battery data on disconnect
+        _batteryData = null;
       });
     } catch (e) {
-      print('Error disconnecting: $e');
     }
   }
 
-  // Function to write the new manufacturer name to characteristic 0x1236
+  // Writes the new manufacturer name to the appropriate characteristic.
   Future<void> _writeManufacturerName(String newName) async {
     if (!_isConnected) {
       _showErrorSnackbar('Error: Not connected to device.');
@@ -311,7 +306,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         Uint8List.fromList(utf8.encode(newName)),
       );
       if (!mounted) return;
-      // Store the new name using DeviceState
+      // Persist the new name.
       Provider.of<DeviceState>(
         context,
         listen: false,
@@ -322,14 +317,14 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     }
   }
 
-  // Function to write the heating characteristic (0 or 1)
+  // Writes the heating characteristic value.
   Future<void> _writeHeatingCharacteristic(bool enableHeating) async {
     if (!_isConnected) {
       _showErrorSnackbar('Error: Not connected to device.');
       return;
     }
     setState(() {
-      _isHeatingCharacteristicUpdating = true; // Set loading state to true
+      _isHeatingCharacteristicUpdating = true;
     });
     try {
       final Uint8List valueToWrite = Uint8List.fromList([
@@ -341,14 +336,12 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         _heatingCharacteristicUuid,
         valueToWrite,
       );
-      // Do NOT update _isHeatingEnabled here. Wait for notification.
       if (!mounted) return;
-      // No setState here, wait for notification
     } catch (e) {
       if (!mounted) return;
       _showErrorSnackbar('Error writing heating status: $e');
       setState(() {
-        _isHeatingCharacteristicUpdating = false; // Reset loading state on error
+        _isHeatingCharacteristicUpdating = false;
       });
     }
   }
@@ -374,7 +367,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                     SizedBox(
                       height: 100,
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             _batteryData != null
@@ -450,7 +443,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
           ),
           const SizedBox(height: 16),
 
-          // New: Charging Information and Battery Heater Information Section
+          // Charging and battery heater information
           Row(
             children: [
               Expanded(
@@ -474,7 +467,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
               ),
             ],
           ),
-          const SizedBox(height: 10), // Space before the new button
+          const SizedBox(height: 10),
 
           // Voltage and Temperature Section
           Row(
@@ -501,7 +494,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
           ),
           const SizedBox(height: 14),
 
-          // New: Enable Battery Heater Button
+          // "Enable Battery Heater" button
           Center(
             child: ElevatedButton.icon(
               onPressed: _isHeatingCharacteristicUpdating || _isLoadingCharacteristic
@@ -514,7 +507,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                     : 'Enable Battery Heater',
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isHeatingEnabled == true ? Colors.red : Colors.green, // Use primary color
+                backgroundColor: _isHeatingEnabled == true ? Colors.red : Colors.green,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                 shape: RoundedRectangleBorder(
@@ -556,15 +549,15 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
             ElevatedButton.icon(
               onPressed: _isLoadingCharacteristic
                   ? null
-                  : _connectAndReadCharacteristic, // Disable if loading
+                  : _connectAndReadCharacteristic,
               icon: const Icon(
                 Icons.bluetooth_connected,
-              ), // Icon for reconnect
+              ),
               label: const Text(
                 'Reconnect',
-              ), // Label for reconnect button
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent, // Different color for reconnect
+                backgroundColor: Colors.blueAccent,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -587,7 +580,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false, // No back button
+        automaticallyImplyLeading: false,
         title: Stack(
           alignment: Alignment.center,
           children: [
@@ -640,7 +633,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     );
   }
 
-  // Helper widget to build voltage cards
+  // Builds the voltage information card.
   Widget _buildVoltageCard(
     BuildContext context,
     int minValue,
@@ -672,7 +665,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
               ],
             ),
             const SizedBox(height: 8),
-            // Display min value left-aligned and max value right-aligned
+            // Display min and max voltage values.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -693,7 +686,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     );
   }
 
-  // Helper widget to build temperature cards
+  // Builds the temperature information card.
   Widget _buildTemperatureCard(
     BuildContext context,
     String status,
@@ -744,7 +737,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     );
   }
 
-  // New: Helper widget to build Charging Information card
+  // Builds the charging information card.
   Widget _buildChargingInfoCard(
     BuildContext context,
     String chargeStatus,
@@ -799,7 +792,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
     );
   }
 
-  // New: Helper widget to build Battery Heater Information card
+  // Builds the battery heater information card.
   Widget _buildBatteryHeaterCard(
     BuildContext context,
     String status,

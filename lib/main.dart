@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Import provider
-import 'package:fahrenclient/device_state.dart'; // Import DeviceState
-import 'package:fahrenclient/device_selection_page.dart'; // Import DeviceSelectionPage
-import 'package:fahrenclient/detailed_view_page.dart'; // Import DetailedViewPage
+import 'package:provider/provider.dart';
+import 'package:fahrenclient/device_state.dart';
+import 'package:fahrenclient/device_selection_page.dart';
+import 'package:fahrenclient/detailed_view_page.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io' show Platform;
 
@@ -44,10 +44,7 @@ class _PermissionHandlerWrapperState extends State<PermissionHandlerWrapper> {
           _permissionsGranted = true;
         });
       } else {
-        // Handle the case where permissions are not granted.
-        // You might want to show a dialog or navigate to a page explaining why permissions are needed.
-        // For now, we'll just print a message.
-        print('Bluetooth permissions not granted.');
+        // Handle the case where permissions are not granted, e.g., by showing a dialog.
       }
     } else {
       // For non-Android platforms, assume permissions are not needed or handled differently.
@@ -73,7 +70,6 @@ class _PermissionHandlerWrapperState extends State<PermissionHandlerWrapper> {
   }
 }
 
-// This is the main application widget.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -99,7 +95,6 @@ class MyApp extends StatelessWidget {
           labelLarge: TextStyle(color: Colors.white),
         ),
         cardTheme:  CardTheme.of(context).copyWith(color: const Color(0xFF2C2C2E)),
-        // Define button themes for a modern look
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green, // Button background color

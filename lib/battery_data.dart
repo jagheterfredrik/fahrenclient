@@ -1,4 +1,4 @@
-import 'dart:typed_data'; // For Uint8List
+import 'dart:typed_data';
 
 class BatteryData {
   final int bmsMode; // uint8_t
@@ -95,7 +95,6 @@ class BatteryData {
     );
   }
 
-  // Helper to get temperature status string
   String get temperatureStatusDetailedString {
     switch (temperatureStatusCharge) {
       case 0:
@@ -126,7 +125,6 @@ class BatteryData {
     }
   }
 
-  // Helper to get BMS mode string
   String get bmsModeString {
     switch (bmsMode) {
       case 0:

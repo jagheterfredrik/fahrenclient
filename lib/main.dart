@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // Import provider
 import 'package:fahrenclient/device_state.dart'; // Import DeviceState
 import 'package:fahrenclient/device_selection_page.dart'; // Import DeviceSelectionPage
-import 'package:fahrenclient/detailed_view_page_v2.dart'; // Import DetailedViewPageV3
+import 'package:fahrenclient/detailed_view_page.dart'; // Import DetailedViewPage
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io' show Platform;
 
@@ -129,7 +129,7 @@ class MyApp extends StatelessWidget {
             // If no device is selected and not loading, show DeviceSelectionPage
             return DeviceSelectionPage();
           } else if (deviceState.selectedDeviceId != null) {
-            return DetailedViewPageV2(
+            return DetailedViewPage(
               uuid: deviceState.selectedDeviceId!,
               deviceName: deviceState.selectedDeviceName,
             );

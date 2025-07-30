@@ -11,12 +11,12 @@ import 'package:fahrenclient/device_state.dart'; // Import DeviceState
 import 'package:fahrenclient/device_selection_page.dart';
 import 'package:universal_ble/universal_ble.dart';
 
-class DetailedViewPageV2 extends StatefulWidget {
+class DetailedViewPage extends StatefulWidget {
   final String uuid; // The UUID to display
   final String? deviceName; // New: Optional device name
   final BatteryData? demoBatteryData; // New: Optional demo battery data
 
-  const DetailedViewPageV2({
+  const DetailedViewPage({
     super.key,
     required this.uuid,
     this.deviceName,
@@ -24,10 +24,10 @@ class DetailedViewPageV2 extends StatefulWidget {
   });
 
   @override
-  _DetailedViewPageV2State createState() => _DetailedViewPageV2State();
+  _DetailedViewPageState createState() => _DetailedViewPageState();
 }
 
-class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
+class _DetailedViewPageState extends State<DetailedViewPage> {
   bool _isConnected = false;
   bool _isLoadingCharacteristic = false;
   bool? _isHeatingEnabled;
@@ -101,7 +101,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
           onTap: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
           child: Text(message),
         ),
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 10),
       ),
     );
   }
@@ -166,12 +166,24 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
       }
 
       // Attempt to connect to the device
-      await UniversalBle.connect(widget.uuid, connectionTimeout: Duration(seconds: 10));
+      await UniversalBle.connect(widget.uuid,
+          connectionTimeout: const Duration(seconds: 10));
       if (!mounted) return;
       setState(() {
         _isConnected = true;
       });
+    } catch (e) {
+      print('Error connecting to device: $e');
+      if (!mounted) return;
+      _showErrorSnackbar('Could not connect to device.');
+      setState(() {
+        _isLoadingCharacteristic = false;
+        _isConnected = false;
+      });
+      return;
+    }
 
+    try {
       await UniversalBle.pair(
         widget.uuid,
         pairingCommand: BleCommand(
@@ -209,49 +221,39 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
 
       UniversalBle.onValueChange = _handleValueChange;
       // Subscribe to battery data characteristic after successful connection
-      _subscribeToBatteryData();
+      await _subscribeToBatteryData();
       // Subscribe to heating characteristic after successful connection
-      _subscribeToHeatingCharacteristic();
+      await _subscribeToHeatingCharacteristic();
     } catch (e) {
-      print('Error connecting or reading characteristic: $e');
+      print('Error reading/subscribing to characteristic: $e');
       if (!mounted) return;
-      _showErrorSnackbar('Error: Could not connect or read characteristic. ($e)');
+      _showErrorSnackbar(
+          'Could not read or subscribe to characteristic. ($e)');
+      await _disconnect();
       setState(() {
         _isLoadingCharacteristic = false;
-        _isConnected = false;
       });
     }
   }
 
   // Function to subscribe to battery data characteristic
   Future<void> _subscribeToBatteryData() async {
-    try {
-      await UniversalBle.subscribeNotifications(
-        widget.uuid,
-        _serviceUuid,
-        _batteryDataCharacteristicUuid,
-      );
+    await UniversalBle.subscribeNotifications(
+      widget.uuid,
+      _serviceUuid,
+      _batteryDataCharacteristicUuid,
+    );
 
-      print('Subscribed to battery data characteristic.');
-    } catch (e) {
-      print('Error subscribing to battery data: $e');
-      if (!mounted) return;
-      _showErrorSnackbar('Error subscribing to battery data: $e');
-    }
+    print('Subscribed to battery data characteristic.');
   }
 
   // Function to subscribe to heating characteristic
   Future<void> _subscribeToHeatingCharacteristic() async {
-    try {
-      await UniversalBle.subscribeNotifications(
-        widget.uuid,
-        _serviceUuid,
-        _heatingCharacteristicUuid,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      _showErrorSnackbar('Error subscribing to heating characteristic: $e');
-    }
+    await UniversalBle.subscribeNotifications(
+      widget.uuid,
+      _serviceUuid,
+      _heatingCharacteristicUuid,
+    );
   }
 
   // Callback function to handle characteristic value changes

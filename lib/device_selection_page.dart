@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
 import 'package:fahrenclient/shared_preferences_helper.dart'; // Import the new helper
-import 'package:fahrenclient/detailed_view_page_v2.dart'; // Import DetailedViewPageV2
+import 'package:fahrenclient/detailed_view_page.dart'; // Import DetailedViewPage
 import 'package:fahrenclient/battery_data.dart'; // Import BatteryData
 
 class DeviceSelectionPage extends StatefulWidget {
@@ -128,7 +128,7 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => DetailedViewPageV2(
+          builder: (context) => DetailedViewPage(
             uuid: device.deviceId,
             deviceName: _getDeviceDisplayName(device), // Pass the device name
           ),
@@ -287,7 +287,7 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => DetailedViewPageV2(
+        builder: (context) => DetailedViewPage(
           uuid: 'DEMO_UUID', // Placeholder UUID for demo mode
           deviceName: 'Demo Device', // Name for demo mode
           demoBatteryData: demoBatteryData, // Pass the demo data

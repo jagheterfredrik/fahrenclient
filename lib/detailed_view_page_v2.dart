@@ -31,7 +31,6 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
   bool _isConnected = false;
   bool _isLoadingCharacteristic = false;
   bool? _isHeatingEnabled;
-  String? _errorMessage;
   bool _isHeatingCharacteristicUpdating = false; // New state for heating characteristic update
   StreamSubscription? _scanSubscription; // Add a subscription for scan stream
   StreamSubscription? _batteryDataSubscription; // Subscription for battery data
@@ -93,6 +92,20 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
     super.dispose();
   }
 
+  void _showErrorSnackbar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: GestureDetector(
+          onTap: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+          child: Text(message),
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
   // Helper to stop any ongoing scan
   void _stopScan() async {
     _scanSubscription?.cancel();
@@ -109,7 +122,6 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
 
     setState(() {
       _isLoadingCharacteristic = true;
-      _errorMessage = null;
     });
 
     try {
@@ -203,8 +215,8 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
     } catch (e) {
       print('Error connecting or reading characteristic: $e');
       if (!mounted) return;
+      _showErrorSnackbar('Error: Could not connect or read characteristic. ($e)');
       setState(() {
-        _errorMessage = 'Error: Could not connect or read characteristic. ($e)';
         _isLoadingCharacteristic = false;
         _isConnected = false;
       });
@@ -224,9 +236,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
     } catch (e) {
       print('Error subscribing to battery data: $e');
       if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Error subscribing to battery data: $e';
-      });
+      _showErrorSnackbar('Error subscribing to battery data: $e');
     }
   }
 
@@ -240,9 +250,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Error subscribing to heating characteristic: $e';
-      });
+      _showErrorSnackbar('Error subscribing to heating characteristic: $e');
     }
   }
 
@@ -290,9 +298,7 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
   // Function to write the new manufacturer name to characteristic 0x1236
   Future<void> _writeManufacturerName(String newName) async {
     if (!_isConnected) {
-      setState(() {
-        _errorMessage = 'Error: Not connected to device.';
-      });
+      _showErrorSnackbar('Error: Not connected to device.');
       return;
     }
     try {
@@ -303,9 +309,6 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
         Uint8List.fromList(utf8.encode(newName)),
       );
       if (!mounted) return;
-      setState(() {
-        _errorMessage = null; // Clear any previous error message
-      });
       // Store the new name using DeviceState
       Provider.of<DeviceState>(
         context,
@@ -313,23 +316,18 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
       ).setSelectedDevice(widget.uuid, newName);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Error writing name: $e';
-      });
+      _showErrorSnackbar('Error writing name: $e');
     }
   }
 
   // Function to write the heating characteristic (0 or 1)
   Future<void> _writeHeatingCharacteristic(bool enableHeating) async {
     if (!_isConnected) {
-      setState(() {
-        _errorMessage = 'Error: Not connected to device.';
-      });
+      _showErrorSnackbar('Error: Not connected to device.');
       return;
     }
     setState(() {
       _isHeatingCharacteristicUpdating = true; // Set loading state to true
-      _errorMessage = null; // Clear any previous error message
     });
     try {
       final Uint8List valueToWrite = Uint8List.fromList([
@@ -346,284 +344,296 @@ class _DetailedViewPageV2State extends State<DetailedViewPageV2> {
       // No setState here, wait for notification
     } catch (e) {
       if (!mounted) return;
+      _showErrorSnackbar('Error writing heating status: $e');
       setState(() {
-        _errorMessage = 'Error writing heating status: $e';
         _isHeatingCharacteristicUpdating = false; // Reset loading state on error
       });
     }
   }
 
+  Widget _buildMainContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Instantaneous power',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 100,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
+                        children: [
+                          Text(
+                            _batteryData != null
+                                ? (() {
+                                    double power = (_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100;
+                                    if (power.abs() < 1000) {
+                                      return '${power.toStringAsFixed(0)}';
+                                    } else {
+                                      return '${(power / 1000).toStringAsFixed(2)}';
+                                    }
+                                  })()
+                                : 'N/A',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 36),
+                          ),
+                          Text(
+                            ((_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100).abs() < 1000 ? 'W' : 'kW',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      'State of Charge',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _showUsableEnergy = !_showUsableEnergy;
+                        });
+                      },
+                      child: SizedBox(
+                        width: 100,
+                        height: 100,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            SizedBox(
+                              width: 90,
+                              height: 90,
+                              child: CircularProgressIndicator(
+                                value: _batteryData != null ? (_batteryData!.batterySOC * 0.05) / 100 : 0.0,
+                                strokeWidth: 8,
+                                backgroundColor: Colors.grey[800],
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                              ),
+                            ),
+                            Text(
+                              _batteryData != null
+                                  ? (_showUsableEnergy
+                                      ? '${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh'
+                                      : '${(_batteryData!.batterySOC * 0.05).toStringAsFixed(0)}%')
+                                  : 'N/A',
+                              style: _showUsableEnergy ? Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 12) : Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // New: Charging Information and Battery Heater Information Section
+          Row(
+            children: [
+              Expanded(
+                child: _buildChargingInfoCard(
+                  context,
+                  _batteryData?.bmsModeString ?? 'N/A',
+                  (_batteryData?.maxChargePowerWatt ?? 0) * .1,
+                  (_batteryData?.maxChargeCurrentAmp ?? 0) * 0.2,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildBatteryHeaterCard(
+                  context,
+                  _batteryData?.batteryHeatingActive == true ? 'Active' : 'Not Active',
+                  ((_batteryData!.powerBatteryHeatingWatt ?? 0).toDouble() / 1.06)
+                      .toInt(),
+                  ((_batteryData!.powerBatteryHeatingReqWatt ?? 0).toDouble() / 1.06)
+                      .toInt(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10), // Space before the new button
+
+          // Voltage and Temperature Section
+          Row(
+            children: [
+              Expanded(
+                child: _buildVoltageCard(
+                  context,
+                  _batteryData?.cellVoltageMin ?? 0,
+                  _batteryData?.cellVoltageMax ?? 0,
+                  0.6, // This value is hardcoded in the original, might need adjustment
+                  Colors.orange,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildTemperatureCard(
+                  context,
+                  _batteryData?.temperatureStatusString ?? "Unknown",
+                  ((_batteryData?.batteryMinTemp ?? 0) * 0.5) - 40,
+                  ((_batteryData?.batteryMaxTemp ?? 0) * 0.5) - 40,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // New: Enable Battery Heater Button
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: _isHeatingCharacteristicUpdating || _isLoadingCharacteristic
+                  ? null
+                  : () => _writeHeatingCharacteristic(!(_isHeatingEnabled ?? false)),
+              icon: const Icon(Icons.power_settings_new),
+              label: Text(
+                _isHeatingEnabled == true
+                    ? 'Disable Battery Heater'
+                    : 'Enable Battery Heater',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isHeatingEnabled == true ? Colors.red : Colors.green, // Use primary color
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: const TextStyle(fontSize: 18),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusScreens() {
+    if (_isLoadingCharacteristic) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Connecting...', textAlign: TextAlign.center),
+          ],
+        ),
+      );
+    } else if (!_isConnected) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Text(
+              'Device disconnected or connection failed.',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12.0),
+            ElevatedButton.icon(
+              onPressed: _isLoadingCharacteristic
+                  ? null
+                  : _connectAndReadCharacteristic, // Disable if loading
+              icon: const Icon(
+                Icons.bluetooth_connected,
+              ), // Icon for reconnect
+              label: const Text(
+                'Reconnect',
+              ), // Label for reconnect button
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent, // Different color for reconnect
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                textStyle: const TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: AppBar(
+        automaticallyImplyLeading: false, // No back button
+        title: Stack(
+          alignment: Alignment.center,
           children: [
-            // Custom Header - Adjusted for perfect centering
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Stack(
-                alignment: Alignment.center, // This centers the text horizontally
-                children: [
-                  TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      hintText: 'Device Name',
-                      border: InputBorder.none,
-                      hintStyle: TextStyle(color: Colors.white70),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                hintText: 'Device Name',
+                border: InputBorder.none,
+                hintStyle: TextStyle(color: Colors.white70),
+              ),
+              style:
+                  Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24),
+              textAlign: TextAlign.center,
+              onEditingComplete: () =>
+                  _writeManufacturerName(_nameController.text),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.electric_car,
+                  color: Colors.white70,
+                  size: 30,
+                ),
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DeviceSelectionPage(),
                     ),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24),
-                    textAlign: TextAlign.center,
-                    onEditingComplete: () =>
-                        _writeManufacturerName(_nameController.text),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.electric_car,
-                        color: Colors.white70,
-                        size: 30,
-                      ),
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => DeviceSelectionPage(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 20),
-
-            if (_isLoadingCharacteristic)
-              const Column(
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Connecting...', textAlign: TextAlign.center),
-                ],
-              )
-            else if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.red, fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else if (!_isConnected)
-              Column(
-                children: [
-                  const Text(
-                    'Device disconnected or connection failed.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12.0),
-                  ElevatedButton.icon(
-                    onPressed: _isLoadingCharacteristic
-                        ? null
-                        : _connectAndReadCharacteristic, // Disable if loading
-                    icon: const Icon(
-                      Icons.bluetooth_connected,
-                    ), // Icon for reconnect
-                    label: const Text(
-                      'Reconnect',
-                    ), // Label for reconnect button
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent, // Different color for reconnect
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      textStyle: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ],
-              )
-            else
-              Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Instantaneous power',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              height: 100,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
-                                children: [
-                                  Text(
-                                    _batteryData != null
-                                        ? (() {
-                                              double power = (_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100;
-                                              if (power.abs() < 1000) {
-                                                return '${power.toStringAsFixed(0)}';
-                                              } else {
-                                                return '${(power / 1000).toStringAsFixed(2)}';
-                                              }
-                                            })()
-                                          : 'N/A',
-                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 36),
-                                  ),
-                                  Text(
-                                    ((_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100).abs() < 1000 ? 'W' : 'kW',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 20),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              'State of Charge',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 10),
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _showUsableEnergy = !_showUsableEnergy;
-                                });
-                              },
-                              child: SizedBox(
-                                width: 100,
-                                height: 100,
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    SizedBox(
-                                      width: 90,
-                                      height: 90,
-                                      child: CircularProgressIndicator(
-                                        value: _batteryData != null ? (_batteryData!.batterySOC * 0.05) / 100 : 0.0,
-                                        strokeWidth: 8,
-                                        backgroundColor: Colors.grey[800],
-                                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
-                                      ),
-                                    ),
-                                    Text(
-                                      _batteryData != null
-                                          ? (_showUsableEnergy
-                                              ? '${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh'
-                                              : '${(_batteryData!.batterySOC * 0.05).toStringAsFixed(0)}%')
-                                          : 'N/A',
-                                      style: _showUsableEnergy ? Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 12) : Theme.of(context).textTheme.titleLarge,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // New: Charging Information and Battery Heater Information Section
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildChargingInfoCard(
-                          context,
-                          _batteryData?.bmsModeString ?? 'N/A',
-                          (_batteryData?.maxChargePowerWatt ?? 0) * .1,
-                          (_batteryData?.maxChargeCurrentAmp ?? 0) * 0.2,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildBatteryHeaterCard(
-                          context,
-                          _batteryData?.batteryHeatingActive == true ? 'Active' : 'Not Active',
-                          ((_batteryData?.powerBatteryHeatingWatt ?? 0).toDouble()/1.06).toInt(),
-                          ((_batteryData?.powerBatteryHeatingReqWatt ?? 0).toDouble()/1.06).toInt(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10), // Space before the new button
-
-                  // Voltage and Temperature Section
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildVoltageCard(
-                          context,
-                          _batteryData?.cellVoltageMin ?? 0,
-                          _batteryData?.cellVoltageMax ?? 0,
-                          0.6, // This value is hardcoded in the original, might need adjustment
-                          Colors.orange,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildTemperatureCard(
-                          context,
-                          _batteryData?.temperatureStatusString ?? "Unknown",
-                          ((_batteryData?.batteryMinTemp ?? 0) * 0.5) - 40,
-                          ((_batteryData?.batteryMaxTemp ?? 0) * 0.5) - 40,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // New: Enable Battery Heater Button
-                  Center(
-                    child: ElevatedButton.icon(
-                      onPressed: _isHeatingCharacteristicUpdating || _isLoadingCharacteristic
-                          ? null
-                          : () => _writeHeatingCharacteristic(!(_isHeatingEnabled ?? false)),
-                      icon: const Icon(Icons.power_settings_new),
-                      label: Text(
-                        _isHeatingEnabled == true
-                            ? 'Disable Battery Heater'
-                            : 'Enable Battery Heater',
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _isHeatingEnabled == true ? Colors.red : Colors.green, // Use primary color
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        textStyle: const TextStyle(fontSize: 18),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
           ],
         ),
+        elevation: 0,
+      ),
+      body: Stack(
+        children: [
+          if (_isConnected)
+            _buildMainContent(),
+          if (_isLoadingCharacteristic || !_isConnected)
+            Container(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              child: _buildStatusScreens(),
+            ),
+        ],
       ),
     );
   }

@@ -108,7 +108,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
           onTap: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
           child: Text(message),
         ),
-        duration: const Duration(seconds: 10),
+        duration: const Duration(seconds: 7),
       ),
     );
   }
@@ -356,172 +356,183 @@ class DetailedViewPageState extends State<DetailedViewPage> {
 
   Widget _buildMainContent() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Instantaneous power',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 100,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _batteryData != null
-                                ? (() {
-                                    double power = (_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100;
-                                    if (power.abs() < 1000) {
-                                      return power.toStringAsFixed(0);
-                                    } else {
-                                      return (power / 1000).toStringAsFixed(2);
-                                    }
-                                  })()
-                                : 'N/A',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 36),
-                          ),
-                          Text(
-                            ((_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100).abs() < 1000 ? 'W' : 'kW',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 20),
-                          ),
-                        ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Instantaneous power',
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      'State of Charge',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 10),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _showUsableEnergy = !_showUsableEnergy;
-                        });
-                      },
-                      child: SizedBox(
-                        width: 100,
+                      const SizedBox(height: 10),
+                      SizedBox(
                         height: 100,
-                        child: Stack(
-                          alignment: Alignment.center,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            SizedBox(
-                              width: 90,
-                              height: 90,
-                              child: CircularProgressIndicator(
-                                value: _batteryData != null ? (_batteryData!.batterySOC * 0.05) / 100 : 0.0,
-                                strokeWidth: 8,
-                                backgroundColor: Colors.grey[800],
-                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
-                              ),
-                            ),
                             Text(
                               _batteryData != null
-                                  ? (_showUsableEnergy
-                                      ? '${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh'
-                                      : '${(_batteryData!.batterySOC * 0.05).toStringAsFixed(0)}%')
+                                  ? (() {
+                                      double power = (_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100;
+                                      if (power.abs() < 1000) {
+                                        return power.toStringAsFixed(0);
+                                      } else {
+                                        return (power / 1000).toStringAsFixed(2);
+                                      }
+                                    })()
                                   : 'N/A',
-                              style: _showUsableEnergy ? Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 12) : Theme.of(context).textTheme.titleLarge,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 36),
+                            ),
+                            Text(
+                              ((_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100).abs() < 1000 ? 'W' : 'kW',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 20),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        'State of Charge',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _showUsableEnergy = !_showUsableEnergy;
+                          });
+                        },
+                        child: SizedBox(
+                          width: 100,
+                          height: 100,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              SizedBox(
+                                width: 90,
+                                height: 90,
+                                child: CircularProgressIndicator(
+                                  value: _batteryData != null ? (_batteryData!.batterySOC * 0.05) / 100 : 0.0,
+                                  strokeWidth: 8,
+                                  backgroundColor: Colors.grey[800],
+                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                                ),
+                              ),
+                              Text(
+                                _batteryData != null
+                                    ? (_showUsableEnergy
+                                        ? '${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh'
+                                        : '${(_batteryData!.batterySOC * 0.05).toStringAsFixed(0)}%')
+                                    : 'N/A',
+                                style: _showUsableEnergy ? Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 12) : Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
 
           // Charging and battery heater information
-          Row(
-            children: [
-              Expanded(
-                child: _buildChargingInfoCard(
-                  context,
-                  _batteryData?.bmsModeString ?? 'N/A',
-                  (_batteryData?.maxChargePowerWatt ?? 0) * .1,
-                  (_batteryData?.maxChargeCurrentAmp ?? 0) * 0.2,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildChargingInfoCard(
+                    context,
+                    _batteryData?.bmsModeString ?? 'N/A',
+                    (_batteryData?.maxChargePowerWatt ?? 0) * .1,
+                    (_batteryData?.maxChargeCurrentAmp ?? 0) * 0.2,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildBatteryHeaterCard(
-                  context,
-                  _batteryData?.batteryHeatingActive == true ? 'Active' : 'Not Active',
-                  (_batteryData!.powerBatteryHeatingWatt.toDouble() / 1.06)
-                      .toInt(),
-                  (_batteryData!.powerBatteryHeatingReqWatt.toDouble() / 1.06)
-                      .toInt(),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildBatteryHeaterCard(
+                    context,
+                    _batteryData?.batteryHeatingActive == true ? 'Active' : 'Not Active',
+                    (_batteryData!.powerBatteryHeatingWatt.toDouble() / 1.06)
+                        .toInt(),
+                    (_batteryData!.powerBatteryHeatingReqWatt.toDouble() / 1.06)
+                        .toInt(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 10),
 
           // Voltage and Temperature Section
-          Row(
-            children: [
-              Expanded(
-                child: _buildVoltageCard(
-                  context,
-                  _batteryData!.cellVoltageMin,
-                  _batteryData!.cellVoltageMax,
-                  0.6, // This value is hardcoded in the original, might need adjustment
-                  Colors.orange,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildVoltageCard(
+                    context,
+                    _batteryData!.cellVoltageMin,
+                    _batteryData!.cellVoltageMax,
+                    0.6, // This value is hardcoded in the original, might need adjustment
+                    Colors.orange,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildTemperatureCard(
-                  context,
-                  _batteryData?.temperatureStatusString ?? "Unknown",
-                  (_batteryData!.batteryMinTemp * 0.5) - 40,
-                  (_batteryData!.batteryMaxTemp * 0.5) - 40,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildTemperatureCard(
+                    context,
+                    _batteryData?.temperatureStatusString ?? "Unknown",
+                    (_batteryData!.batteryMinTemp * 0.5) - 40,
+                    (_batteryData!.batteryMaxTemp * 0.5) - 40,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 14),
 
           // "Enable Battery Heater" button
-          Center(
-            child: ElevatedButton.icon(
-              onPressed: _isHeatingCharacteristicUpdating || _isLoadingCharacteristic
-                  ? null
-                  : () => _writeHeatingCharacteristic(!(_isHeatingEnabled ?? false)),
-              icon: const Icon(Icons.power_settings_new),
-              label: Text(
-                _isHeatingEnabled == true
-                    ? 'Disable Battery Heater'
-                    : 'Enable Battery Heater',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isHeatingEnabled == true ? Colors.red : Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Center(
+              child: ElevatedButton.icon(
+                onPressed: _isHeatingCharacteristicUpdating || _isLoadingCharacteristic
+                    ? null
+                    : () => _writeHeatingCharacteristic(!(_isHeatingEnabled ?? false)),
+                icon: const Icon(Icons.power_settings_new),
+                label: Text(
+                  _isHeatingEnabled == true
+                      ? 'Disable Battery Heater'
+                      : 'Enable Battery Heater',
                 ),
-                textStyle: const TextStyle(fontSize: 18),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _isHeatingEnabled == true ? Colors.red : Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: const TextStyle(fontSize: 18),
+                ),
               ),
             ),
           ),

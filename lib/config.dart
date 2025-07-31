@@ -1,4 +1,5 @@
-// Keys for storing device information in SharedPreferences.
-const String _kSelectedDeviceIdKey = 'selected_device_id';
-const String _kSelectedDeviceNameKey =
-    'selected_device_name';
+// BLE Service and Characteristic UUIDs
+const String kServiceUuid = 'ABCD';
+const String kHeatingCharacteristicUuid = 'DEAD';
+const String kManufacturerNameCharacteristicUuid = 'F00D';
+const String kBatteryDataCharacteristicUuid = 'BABE';

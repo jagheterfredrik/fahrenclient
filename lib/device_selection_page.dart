@@ -5,9 +5,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
-import 'package:fahrenclient/shared_preferences_helper.dart';
 import 'package:fahrenclient/detailed_view_page.dart';
 import 'package:fahrenclient/battery_data.dart';
+import 'package:fahrenclient/device_state.dart'; // Import DeviceState
+import 'package:provider/provider.dart'; // Import provider
 
 class DeviceSelectionPage extends StatefulWidget {
   final String? rememberedDeviceName;
@@ -20,10 +21,10 @@ class DeviceSelectionPage extends StatefulWidget {
   });
 
   @override
-  _DeviceSelectionPageState createState() => _DeviceSelectionPageState();
+  DeviceSelectionPageState createState() => DeviceSelectionPageState();
 }
 
-class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
+class DeviceSelectionPageState extends State<DeviceSelectionPage> {
   final List<BleDevice> _scannedDevices = [];
   bool _isScanning = false;
   StreamSubscription? _scanSubscription;
@@ -41,8 +42,7 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
 
   // Gets the display name of a BLE device.
   String _getDeviceDisplayName(BleDevice device) {
-    if (device.manufacturerDataList != null &&
-        device.manufacturerDataList.isNotEmpty) {
+    if (device.manufacturerDataList.isNotEmpty) {
       for (ManufacturerData manufacturerDataEntry
           in device.manufacturerDataList) {
         try {
@@ -116,11 +116,6 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
   // Saves the selected device and navigates to the detailed view.
   Future<void> _selectDevice(BleDevice device) async {
     _stopScan();
-    await SharedPreferencesHelper.saveSelectedDevice(
-      device.deviceId,
-      _getDeviceDisplayName(device),
-    );
-
     // Navigate to the detailed view page.
     if (mounted) {
       // Ensure the widget is still in the tree.
@@ -144,6 +139,26 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final deviceState = Provider.of<DeviceState>(context);
+    final pairedDeviceIds = deviceState.pairedDeviceIds;
+
+    // Sort devices: paired devices first, then by name
+    final List<BleDevice> sortedDevices = List.from(_scannedDevices);
+    sortedDevices.sort((a, b) {
+      final bool aIsPaired = pairedDeviceIds.contains(a.deviceId);
+      final bool bIsPaired = pairedDeviceIds.contains(b.deviceId);
+
+      if (aIsPaired && !bIsPaired) {
+        return -1; // a comes before b
+      } else if (!aIsPaired && bIsPaired) {
+        return 1; // b comes before a
+      } else {
+        // If both are paired or both are not paired, sort by name
+        return _getDeviceDisplayName(a)
+            .compareTo(_getDeviceDisplayName(b));
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -176,9 +191,10 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
                     ),
                   )
                 : ListView.builder(
-                    itemCount: _scannedDevices.length,
+                    itemCount: sortedDevices.length,
                     itemBuilder: (BuildContext context, int index) {
-                      final BleDevice device = _scannedDevices[index];
+                      final BleDevice device = sortedDevices[index];
+                      final bool isPaired = pairedDeviceIds.contains(device.deviceId);
                       return Card(
                         margin: const EdgeInsets.symmetric(
                           vertical: 8.0,
@@ -195,13 +211,25 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
                           borderRadius: BorderRadius.circular(10.0),
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: Text(
-                              _getDeviceDisplayName(device),
-                              style: const TextStyle(
-                                fontSize: 16.0,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.deepPurple,
-                              ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _getDeviceDisplayName(device),
+                                    style: const TextStyle(
+                                      fontSize: 16.0,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.deepPurple,
+                                    ),
+                                  ),
+                                ),
+                                if (isPaired)
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 20,
+                                  ),
+                              ],
                             ),
                           ),
                         ),

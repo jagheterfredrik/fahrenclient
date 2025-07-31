@@ -5,11 +5,11 @@ import 'dart:convert';
 
 import 'package:fahrenclient/battery_data.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fahrenclient/device_state.dart';
 import 'package:fahrenclient/device_selection_page.dart';
 import 'package:universal_ble/universal_ble.dart';
+import 'package:fahrenclient/config.dart';
 
 class DetailedViewPage extends StatefulWidget {
   final String uuid;
@@ -24,10 +24,10 @@ class DetailedViewPage extends StatefulWidget {
   });
 
   @override
-  _DetailedViewPageState createState() => _DetailedViewPageState();
+  DetailedViewPageState createState() => DetailedViewPageState();
 }
 
-class _DetailedViewPageState extends State<DetailedViewPage> {
+class DetailedViewPageState extends State<DetailedViewPage> {
   bool _isConnected = false;
   bool _isLoadingCharacteristic = false;
   bool? _isHeatingEnabled;
@@ -39,13 +39,13 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
   bool _showUsableEnergy = false;
   ScaffoldMessengerState? _scaffoldMessengerState;
 
-  final String _serviceUuid = BleUuidParser.string('ABCD');
+  final String _serviceUuid = BleUuidParser.string(kServiceUuid);
   final String _heatingCharacteristicUuid =
-      BleUuidParser.string('DEAD');
+      BleUuidParser.string(kHeatingCharacteristicUuid);
   final String _manufacturerNameCharacteristicUuid =
-      'F00D';
+      BleUuidParser.string(kManufacturerNameCharacteristicUuid);
   final String _batteryDataCharacteristicUuid =
-      'BABE';
+      BleUuidParser.string(kBatteryDataCharacteristicUuid);
 
   late TextEditingController
   _nameController;
@@ -194,6 +194,13 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         ),
       );
 
+      // Mark the device as paired after successful UniversalBle.pair
+      if (!mounted) return;
+      await Provider.of<DeviceState>(context, listen: false).setSelectedDevice(
+        widget.uuid,
+        widget.deviceName ?? 'Unknown Device',
+      );
+
       await UniversalBle.discoverServices(widget.uuid);
 
       final Uint8List value = await UniversalBle.read(
@@ -289,6 +296,7 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
         _batteryData = null;
       });
     } catch (e) {
+      // Ignore exceptions
     }
   }
 
@@ -374,9 +382,9 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                                 ? (() {
                                     double power = (_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100;
                                     if (power.abs() < 1000) {
-                                      return '${power.toStringAsFixed(0)}';
+                                      return power.toStringAsFixed(0);
                                     } else {
-                                      return '${(power / 1000).toStringAsFixed(2)}';
+                                      return (power / 1000).toStringAsFixed(2);
                                     }
                                   })()
                                 : 'N/A',
@@ -459,9 +467,9 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                 child: _buildBatteryHeaterCard(
                   context,
                   _batteryData?.batteryHeatingActive == true ? 'Active' : 'Not Active',
-                  ((_batteryData!.powerBatteryHeatingWatt ?? 0).toDouble() / 1.06)
+                  (_batteryData!.powerBatteryHeatingWatt.toDouble() / 1.06)
                       .toInt(),
-                  ((_batteryData!.powerBatteryHeatingReqWatt ?? 0).toDouble() / 1.06)
+                  (_batteryData!.powerBatteryHeatingReqWatt.toDouble() / 1.06)
                       .toInt(),
                 ),
               ),
@@ -475,8 +483,8 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
               Expanded(
                 child: _buildVoltageCard(
                   context,
-                  _batteryData?.cellVoltageMin ?? 0,
-                  _batteryData?.cellVoltageMax ?? 0,
+                  _batteryData!.cellVoltageMin,
+                  _batteryData!.cellVoltageMax,
                   0.6, // This value is hardcoded in the original, might need adjustment
                   Colors.orange,
                 ),
@@ -486,8 +494,8 @@ class _DetailedViewPageState extends State<DetailedViewPage> {
                 child: _buildTemperatureCard(
                   context,
                   _batteryData?.temperatureStatusString ?? "Unknown",
-                  ((_batteryData?.batteryMinTemp ?? 0) * 0.5) - 40,
-                  ((_batteryData?.batteryMaxTemp ?? 0) * 0.5) - 40,
+                  (_batteryData!.batteryMinTemp * 0.5) - 40,
+                  (_batteryData!.batteryMaxTemp * 0.5) - 40,
                 ),
               ),
             ],

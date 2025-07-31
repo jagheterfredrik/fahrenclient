@@ -790,16 +790,25 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Charging estimate\n${estimatedPower.toStringAsFixed(1)}kW',
+                  'Charging estimate',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
-                Text(
-                  '\n${estimatedCurrent.toStringAsFixed(1)}A',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${estimatedPower.toStringAsFixed(1)}kW',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                    ),
+                    Text(
+                      '${estimatedCurrent.toStringAsFixed(1)}A',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                    ),
+                  ],
                 ),
               ],
             ),

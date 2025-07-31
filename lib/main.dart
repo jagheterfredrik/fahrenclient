@@ -79,7 +79,7 @@ class MyApp extends StatelessWidget {
       title: 'Fahrenheat App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // brightness: Brightness.dark, // Dark theme
+        brightness: Brightness.dark, // Dark theme
         // primarySwatch: Colors.green,
         scaffoldBackgroundColor: const Color(0xFF1C1C1E),
         appBarTheme: const AppBarTheme(
@@ -127,6 +127,7 @@ class MyApp extends StatelessWidget {
             return DetailedViewPage(
               uuid: deviceState.selectedDeviceId!,
               deviceName: deviceState.selectedDeviceName,
+              isDemoMode: false,
             );
           } else {
             // Show a loading indicator while the device state is being loaded

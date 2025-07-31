@@ -6,9 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
 import 'package:fahrenclient/detailed_view_page.dart';
-import 'package:fahrenclient/battery_data.dart';
-import 'package:fahrenclient/device_state.dart'; // Import DeviceState
-import 'package:provider/provider.dart'; // Import provider
+import 'package:fahrenclient/device_state.dart';
+import 'package:provider/provider.dart';
 
 class DeviceSelectionPage extends StatefulWidget {
   final String? rememberedDeviceName;
@@ -28,6 +27,7 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
   final List<BleDevice> _scannedDevices = [];
   bool _isScanning = false;
   StreamSubscription? _scanSubscription;
+  Timer? _scanTimer;
 
   @override
   void initState() {
@@ -70,10 +70,23 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
       _scannedDevices.clear();
     });
 
+    _scanTimer?.cancel();
+    _scanTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted && _isScanning) {
+        _stopScan();
+      }
+    });
+
     try {
-      List<BleDevice> devices = await UniversalBle.getSystemDevices(withServices: ['ABCD']);
-      _scannedDevices.addAll(devices);
+      List<BleDevice> devices =
+          await UniversalBle.getSystemDevices(withServices: ['ABCD']);
+      if (mounted) {
+        setState(() {
+          _scannedDevices.addAll(devices);
+        });
+      }
       _scanSubscription = UniversalBle.scanStream.listen((scanResult) {
+        if (!mounted) return;
         setState(() {
           // Check if the device is already in the list.
           int existingIndex = _scannedDevices.indexWhere(
@@ -85,7 +98,8 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
           } else {
             // If the device is already in the list, update its manufacturer data.
             // _scannedDevices[existingIndex] = scanResult;
-            _scannedDevices[existingIndex].manufacturerDataList = scanResult.manufacturerDataList;
+            _scannedDevices[existingIndex].manufacturerDataList =
+                scanResult.manufacturerDataList;
           }
         });
       });
@@ -93,14 +107,17 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
       ScanFilter filter = ScanFilter(withServices: ['ABCD']);
       await UniversalBle.startScan(scanFilter: filter);
     } catch (e) {
-      setState(() {
-        _isScanning = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+      }
     }
   }
 
   // Stops the BLE scan.
   void _stopScan() async {
+    _scanTimer?.cancel();
     if (_isScanning) {
       await UniversalBle.stopScan();
       _scanSubscription?.cancel();
@@ -133,8 +150,45 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
 
   @override
   void dispose() {
+    _scanTimer?.cancel();
     _stopScan();
     super.dispose();
+  }
+  Widget _buildDeviceCard(
+      BleDevice device, Future<void> Function(BleDevice) onTap) {
+    return Card(
+      margin: const EdgeInsets.symmetric(
+        vertical: 8.0,
+        horizontal: 16.0,
+      ),
+      elevation: 4.0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10.0),
+      ),
+      child: InkWell(
+        onTap: () => onTap(
+          device,
+        ),
+        borderRadius: BorderRadius.circular(10.0),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _getDeviceDisplayName(device),
+                  style: const TextStyle(
+                    fontSize: 16.0,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -142,27 +196,24 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
     final deviceState = Provider.of<DeviceState>(context);
     final pairedDeviceIds = deviceState.pairedDeviceIds;
 
-    // Sort devices: paired devices first, then by name
-    final List<BleDevice> sortedDevices = List.from(_scannedDevices);
-    sortedDevices.sort((a, b) {
-      final bool aIsPaired = pairedDeviceIds.contains(a.deviceId);
-      final bool bIsPaired = pairedDeviceIds.contains(b.deviceId);
+    // Separate devices into paired and unpaired lists
+    final List<BleDevice> pairedDevices = _scannedDevices
+        .where((device) => pairedDeviceIds.contains(device.deviceId))
+        .toList();
+    final List<BleDevice> unpairedDevices = _scannedDevices
+        .where((device) => !pairedDeviceIds.contains(device.deviceId))
+        .toList();
 
-      if (aIsPaired && !bIsPaired) {
-        return -1; // a comes before b
-      } else if (!aIsPaired && bIsPaired) {
-        return 1; // b comes before a
-      } else {
-        // If both are paired or both are not paired, sort by name
-        return _getDeviceDisplayName(a)
-            .compareTo(_getDeviceDisplayName(b));
-      }
-    });
+    // Sort both lists by device name
+    pairedDevices.sort((a, b) =>
+        _getDeviceDisplayName(a).compareTo(_getDeviceDisplayName(b)));
+    unpairedDevices.sort((a, b) =>
+        _getDeviceDisplayName(a).compareTo(_getDeviceDisplayName(b)));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Fahrenheat - Select Device',
+          'Select Device',
         ),
         centerTitle: true,
         elevation: 0,
@@ -170,19 +221,7 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
       body: Column(
         children: [
           Expanded(
-            child: _isScanning && _scannedDevices.isEmpty
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Scanning for devices...'),
-                      ],
-                    ),
-                  )
-                : _scannedDevices.isEmpty &&
-                      !_isScanning
+            child: _scannedDevices.isEmpty && !_isScanning
                 ? const Center(
                     child: Text(
                       'No devices found.',
@@ -190,53 +229,74 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
                       style: TextStyle(fontSize: 16, color: Colors.grey),
                     ),
                   )
-                : ListView.builder(
-                    itemCount: sortedDevices.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      final BleDevice device = sortedDevices[index];
-                      final bool isPaired = pairedDeviceIds.contains(device.deviceId);
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          vertical: 8.0,
-                          horizontal: 16.0,
-                        ),
-                        elevation: 4.0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.0),
-                        ),
-                        child: InkWell(
-                          onTap: () => _selectDevice(
-                            device,
-                          ),
-                          borderRadius: BorderRadius.circular(10.0),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    _getDeviceDisplayName(device),
-                                    style: const TextStyle(
-                                      fontSize: 16.0,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.deepPurple,
-                                    ),
-                                  ),
-                                ),
-                                if (isPaired)
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green,
-                                    size: 20,
-                                  ),
-                              ],
+                : ListView(
+                    children: [
+                      if (pairedDevices.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 16.0, vertical: 8.0),
+                          child: Text(
+                            'Paired Devices',
+                            style: TextStyle(
+                              fontSize: 18.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white70,
                             ),
                           ),
                         ),
-                      );
-                    },
+                        ...pairedDevices.map((device) =>
+                            _buildDeviceCard(device, _selectDevice)),
+                      ],
+                      if (unpairedDevices.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 16.0, vertical: 8.0),
+                          child: Text(
+                            'Available Devices',
+                            style: TextStyle(
+                              fontSize: 18.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                        ...unpairedDevices.map((device) =>
+                            _buildDeviceCard(device, _selectDevice)),
+                      ],
+                    ],
                   ),
           ),
+          if (_isScanning)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Scanning for devices...'),
+                ],
+              ),
+            ),
+          if (!_isScanning)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 16.0),
+              child: ElevatedButton.icon(
+                onPressed: _startScan,
+                label: const Text('Scan Again'),
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                  elevation: 5,
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(bottom: 24.0),
             child: ElevatedButton.icon(
@@ -246,13 +306,14 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30.0),
                 ),
                 elevation: 5,
               ),
-            ),
+            ), // Closing ElevatedButton
           ),
         ],
       ),
@@ -260,20 +321,6 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
   }
 
   void _startDemoMode() {
-    // Static hex string representing demo battery data.
-    const String demoHexString = '04983FF405C20147021706842E01F40182849F0B960B000000';
-    
-    // Convert the hex string to a byte list.
-    Uint8List demoBytes = Uint8List.fromList(
-      List.generate(demoHexString.length ~/ 2, (i) {
-        return int.parse(demoHexString.substring(i * 2, i * 2 + 2), radix: 16);
-      }),
-    );
-    
-    // Create a BatteryData object from the demo bytes.
-    final BatteryData demoBatteryData = BatteryData.fromBytes(demoBytes);
-    
-    // Navigate to the detailed view page with the demo data.
     _stopScan();
     Navigator.pushReplacement(
       context,
@@ -281,7 +328,7 @@ class DeviceSelectionPageState extends State<DeviceSelectionPage> {
         builder: (context) => DetailedViewPage(
           uuid: 'DEMO_UUID',
           deviceName: 'Demo Device',
-          demoBatteryData: demoBatteryData,
+          isDemoMode: true,
         ),
       ),
     );

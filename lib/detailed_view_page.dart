@@ -14,13 +14,13 @@ import 'package:fahrenclient/config.dart';
 class DetailedViewPage extends StatefulWidget {
   final String uuid;
   final String? deviceName;
-  final BatteryData? demoBatteryData;
+  final bool isDemoMode;
 
   const DetailedViewPage({
     super.key,
     required this.uuid,
     this.deviceName,
-    this.demoBatteryData,
+    this.isDemoMode = false,
   });
 
   @override
@@ -57,16 +57,21 @@ class DetailedViewPageState extends State<DetailedViewPage> {
       text: widget.deviceName,
     );
 
-    if (widget.demoBatteryData != null) {
+    if (widget.isDemoMode) {
       // Use static data in demo mode
       setState(() {
-        _batteryData = widget.demoBatteryData;
+        Uint8List demoBytes = Uint8List.fromList(
+          List.generate(kDemoBatteryDataHexString.length ~/ 2, (i) {
+            return int.parse(kDemoBatteryDataHexString.substring(i * 2, i * 2 + 2), radix: 16);
+          }),
+        );
+        _batteryData = BatteryData.fromBytes(demoBytes);
         _isConnected = true;
       });
     } else {
       // Proceed with BLE connection
       _connectAndReadCharacteristic();
-    
+
       // Listen to the connection stream to update the UI
       UniversalBle.connectionStream(widget.uuid).listen((bool isConnected) {
         if (!mounted) return;
@@ -186,6 +191,8 @@ class DetailedViewPageState extends State<DetailedViewPage> {
     }
 
     try {
+      await UniversalBle.discoverServices(widget.uuid);
+
       await UniversalBle.pair(
         widget.uuid,
         pairingCommand: BleCommand(
@@ -200,8 +207,6 @@ class DetailedViewPageState extends State<DetailedViewPage> {
         widget.uuid,
         widget.deviceName ?? 'Unknown Device',
       );
-
-      await UniversalBle.discoverServices(widget.uuid);
 
       final Uint8List value = await UniversalBle.read(
         widget.uuid,
@@ -355,6 +360,18 @@ class DetailedViewPageState extends State<DetailedViewPage> {
   }
 
   Widget _buildMainContent() {
+    if (_batteryData == null) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Waiting for data...'),
+          ],
+        ),
+      );
+    }
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -392,7 +409,9 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 36),
                             ),
                             Text(
-                              _batteryData!.instantaneousPower.abs() < 1000 ? 'W' : 'kW',
+                              _batteryData != null
+                                  ? (_batteryData!.instantaneousPower.abs() < 1000 ? 'W' : 'kW')
+                                  : '',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 20),
                             ),
                           ],

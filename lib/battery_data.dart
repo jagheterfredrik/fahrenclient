@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 class BatteryData {
@@ -115,12 +116,12 @@ class BatteryData {
     return maxChargeCurrentAmp * 0.2;
   }
 
-  double get powerBatteryHeatingWattCalculated {
-    return powerBatteryHeatingWatt.toDouble() / 1.06;
+  int get powerBatteryHeatingWattCalculated {
+    return max(0, powerBatteryHeatingWatt - 1);
   }
 
-  double get powerBatteryHeatingReqWattCalculated {
-    return powerBatteryHeatingReqWatt.toDouble() / 1.06;
+  int get powerBatteryHeatingReqWattCalculated {
+    return max(0, powerBatteryHeatingReqWatt - 6);
   }
 
   double get batteryMinTempC {
@@ -132,11 +133,11 @@ class BatteryData {
   }
 
   int get cellVoltageMinMv {
-    return cellVoltageMin + 1000;
+    return cellVoltageMin == 0 ? 0 : cellVoltageMin + 1000;
   }
 
   int get cellVoltageMaxMv {
-    return cellVoltageMax + 1000;
+    return cellVoltageMax == 0 ? 0 : cellVoltageMax + 1000;
   }
 
   String get temperatureStatusDetailedString {

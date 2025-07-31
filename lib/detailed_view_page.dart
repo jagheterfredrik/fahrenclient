@@ -381,7 +381,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                             Text(
                               _batteryData != null
                                   ? (() {
-                                      double power = (_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100;
+                                      double power = _batteryData!.instantaneousPower;
                                       if (power.abs() < 1000) {
                                         return power.toStringAsFixed(0);
                                       } else {
@@ -392,7 +392,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 36),
                             ),
                             Text(
-                              ((_batteryData!.bmsCurrent - 16300) * (_batteryData!.bmsVoltage * 2.5) / -100).abs() < 1000 ? 'W' : 'kW',
+                              _batteryData!.instantaneousPower.abs() < 1000 ? 'W' : 'kW',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 20),
                             ),
                           ],
@@ -427,7 +427,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                                 width: 90,
                                 height: 90,
                                 child: CircularProgressIndicator(
-                                  value: _batteryData != null ? (_batteryData!.batterySOC * 0.05) / 100 : 0.0,
+                                  value: _batteryData != null ? (_batteryData!.batterySOCPercentage) / 100 : 0.0,
                                   strokeWidth: 8,
                                   backgroundColor: Colors.grey[800],
                                   valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
@@ -436,8 +436,8 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                               Text(
                                 _batteryData != null
                                     ? (_showUsableEnergy
-                                        ? '${(_batteryData!.usableEnergyAmountWh * 5).toStringAsFixed(0)} Wh'
-                                        : '${(_batteryData!.batterySOC * 0.05).toStringAsFixed(0)}%')
+                                        ? '${(_batteryData!.usableEnergyAmountWhCalculated).toStringAsFixed(0)} Wh'
+                                        : '${(_batteryData!.batterySOCPercentage).toStringAsFixed(0)}%')
                                     : 'N/A',
                                 style: _showUsableEnergy ? Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 12) : Theme.of(context).textTheme.titleLarge,
                               ),
@@ -462,8 +462,8 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                   child: _buildChargingInfoCard(
                     context,
                     _batteryData?.bmsModeString ?? 'N/A',
-                    (_batteryData?.maxChargePowerWatt ?? 0) * .1,
-                    (_batteryData?.maxChargeCurrentAmp ?? 0) * 0.2,
+                    _batteryData?.maxChargePowerKw ?? 0.0,
+                    _batteryData?.maxChargeCurrentAmpCalculated ?? 0.0,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -471,10 +471,8 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                   child: _buildBatteryHeaterCard(
                     context,
                     _batteryData?.batteryHeatingActive == true ? 'Active' : 'Not Active',
-                    (_batteryData!.powerBatteryHeatingWatt.toDouble() / 1.06)
-                        .toInt(),
-                    (_batteryData!.powerBatteryHeatingReqWatt.toDouble() / 1.06)
-                        .toInt(),
+                    _batteryData!.powerBatteryHeatingWattCalculated.toInt(),
+                    _batteryData!.powerBatteryHeatingReqWattCalculated.toInt(),
                   ),
                 ),
               ],
@@ -490,8 +488,8 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                 Expanded(
                   child: _buildVoltageCard(
                     context,
-                    _batteryData!.cellVoltageMin,
-                    _batteryData!.cellVoltageMax,
+                    _batteryData!.cellVoltageMinMv,
+                    _batteryData!.cellVoltageMaxMv,
                     0.6, // This value is hardcoded in the original, might need adjustment
                     Colors.orange,
                   ),
@@ -501,8 +499,8 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                   child: _buildTemperatureCard(
                     context,
                     _batteryData?.temperatureStatusString ?? "Unknown",
-                    (_batteryData!.batteryMinTemp * 0.5) - 40,
-                    (_batteryData!.batteryMaxTemp * 0.5) - 40,
+                    _batteryData!.batteryMinTempC,
+                    _batteryData!.batteryMaxTempC,
                   ),
                 ),
               ],
@@ -678,7 +676,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                 const Icon(Icons.battery_full, color: Colors.green),
                 const SizedBox(width: 4),
                 Text(
-                  'Δ ${maxValue - minValue} mV',
+                  'Δ ${maxValue - minValue}mV',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
@@ -689,11 +687,11 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Min\n${minValue + 1000} mV',
+                  'Min\n${minValue}mV',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Text(
-                  'Max\n${maxValue + 1000} mV',
+                  'Max\n${maxValue}mV',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
                   textAlign: TextAlign.right,
                 ),
@@ -772,7 +770,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Charging',
+              'BMS',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 8),
@@ -796,11 +794,11 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Estimated\n${estimatedPower.toStringAsFixed(1)} kW',
+                  'Charging estimate\n${estimatedPower.toStringAsFixed(1)}kW',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Text(
-                  '\n${estimatedCurrent.toStringAsFixed(1)} A',
+                  '\n${estimatedCurrent.toStringAsFixed(1)}A',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
               ],

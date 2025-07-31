@@ -95,6 +95,50 @@ class BatteryData {
     );
   }
 
+  double get instantaneousPower {
+    return (bmsCurrent - 16300) * (bmsVoltage * 2.5) / -100;
+  }
+
+  double get batterySOCPercentage {
+    return batterySOC * 0.05;
+  }
+
+  double get usableEnergyAmountWhCalculated {
+    return usableEnergyAmountWh * 5.0;
+  }
+
+  double get maxChargePowerKw {
+    return maxChargePowerWatt * 0.1;
+  }
+
+  double get maxChargeCurrentAmpCalculated {
+    return maxChargeCurrentAmp * 0.2;
+  }
+
+  double get powerBatteryHeatingWattCalculated {
+    return powerBatteryHeatingWatt.toDouble() / 1.06;
+  }
+
+  double get powerBatteryHeatingReqWattCalculated {
+    return powerBatteryHeatingReqWatt.toDouble() / 1.06;
+  }
+
+  double get batteryMinTempC {
+    return (batteryMinTemp * 0.5) - 40;
+  }
+
+  double get batteryMaxTempC {
+    return (batteryMaxTemp * 0.5) - 40;
+  }
+
+  int get cellVoltageMinMv {
+    return cellVoltageMin + 1000;
+  }
+
+  int get cellVoltageMaxMv {
+    return cellVoltageMax + 1000;
+  }
+
   String get temperatureStatusDetailedString {
     switch (temperatureStatusCharge) {
       case 0:
@@ -128,7 +172,7 @@ class BatteryData {
   String get bmsModeString {
     switch (bmsMode) {
       case 0:
-        return 'Off';
+        return 'Not ready';
       case 1:
         return 'Ready';
       case 2:

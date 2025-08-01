@@ -27,7 +27,8 @@ class DetailedViewPage extends StatefulWidget {
   DetailedViewPageState createState() => DetailedViewPageState();
 }
 
-class DetailedViewPageState extends State<DetailedViewPage> {
+class DetailedViewPageState extends State<DetailedViewPage>
+    with WidgetsBindingObserver {
   bool _isConnected = false;
   bool _isLoadingCharacteristic = false;
   bool? _isHeatingEnabled;
@@ -55,6 +56,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // Add this line
     _nameController = TextEditingController(text: widget.deviceName);
 
     if (widget.isDemoMode) {
@@ -104,7 +106,19 @@ class DetailedViewPageState extends State<DetailedViewPage> {
     _batteryDataSubscription?.cancel();
     UniversalBle.onValueChange = null;
     _stopScan();
+    WidgetsBinding.instance.removeObserver(this); // Remove this line
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed &&
+        !_isConnected &&
+        !widget.isDemoMode) {
+      // App is resumed from background and device is disconnected, try to reconnect
+      _connectAndReadCharacteristic();
+    }
   }
 
   void _showErrorSnackbar(String message) {
@@ -409,25 +423,25 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              _batteryData != null
+                              _batteryData != null && _batteryData!.bmsMode != 7
                                   ? (() {
-                                      double power =
-                                          _batteryData!.instantaneousPower;
-                                      if (power.abs() < 1000) {
-                                        return power.toStringAsFixed(0);
-                                      } else {
-                                        return (power / 1000).toStringAsFixed(
-                                          2,
-                                        );
-                                      }
-                                    })()
-                                  : 'N/A',
+                                        double power =
+                                            _batteryData!.instantaneousPower;
+                                        if (power.abs() < 1000) {
+                                          return power.toStringAsFixed(0);
+                                        } else {
+                                          return (power / 1000).toStringAsFixed(
+                                            2,
+                                          );
+                                        }
+                                      })()
+                                  : '-',
                               style: Theme.of(
                                 context,
                               ).textTheme.titleLarge?.copyWith(fontSize: 36),
                             ),
                             Text(
-                              _batteryData != null
+                              _batteryData != null && _batteryData!.bmsMode != 7
                                   ? (_batteryData!.instantaneousPower.abs() <
                                             1000
                                         ? 'W'
@@ -510,23 +524,11 @@ class DetailedViewPageState extends State<DetailedViewPage> {
             child: Row(
               children: [
                 Expanded(
-                  child: _buildChargingInfoCard(
-                    context,
-                    _batteryData?.bmsModeString ?? 'N/A',
-                    _batteryData?.maxChargePowerKw ?? 0.0,
-                    _batteryData?.maxChargeCurrentAmpCalculated ?? 0.0,
-                  ),
+                  child: _buildChargingInfoCard(context),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _buildBatteryHeaterCard(
-                    context,
-                    _batteryData?.batteryHeatingActive == true
-                        ? 'Active'
-                        : 'Not Active',
-                    _batteryData!.powerBatteryHeatingWattCalculated.toInt(),
-                    _batteryData!.powerBatteryHeatingReqWattCalculated.toInt(),
-                  ),
+                  child: _buildBatteryHeaterCard(context),
                 ),
               ],
             ),
@@ -539,22 +541,11 @@ class DetailedViewPageState extends State<DetailedViewPage> {
             child: Row(
               children: [
                 Expanded(
-                  child: _buildVoltageCard(
-                    context,
-                    _batteryData!.cellVoltageMinMv,
-                    _batteryData!.cellVoltageMaxMv,
-                    0.6, // This value is hardcoded in the original, might need adjustment
-                    Colors.orange,
-                  ),
+                  child: _buildVoltageCard(context),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _buildTemperatureCard(
-                    context,
-                    _batteryData?.temperatureStatusString ?? "Unknown",
-                    _batteryData!.batteryMinTempC,
-                    _batteryData!.batteryMaxTempC,
-                  ),
+                  child: _buildTemperatureCard(context),
                 ),
               ],
             ),
@@ -708,13 +699,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
   }
 
   // Builds the voltage information card.
-  Widget _buildVoltageCard(
-    BuildContext context,
-    int minValue,
-    int maxValue,
-    double progress,
-    Color progressColor,
-  ) {
+  Widget _buildVoltageCard(BuildContext context) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -730,7 +715,9 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                 const Icon(Icons.battery_full, color: Colors.green),
                 const SizedBox(width: 4),
                 Text(
-                  '${_batteryData!.packVoltage.toStringAsFixed(2)}V',
+                  _batteryData!.bmsMode != 7
+                      ? '${_batteryData!.packVoltage.toStringAsFixed(2)}V'
+                      : '-',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
@@ -741,13 +728,17 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Min\n${minValue}mV',
+                  _batteryData!.bmsMode != 7
+                      ? 'Min\n${_batteryData!.cellVoltageMinMv}mV'
+                      : 'Min\n-',
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Text(
-                  'Max\n${maxValue}mV',
+                  _batteryData!.bmsMode != 7
+                      ? 'Max\n${_batteryData!.cellVoltageMaxMv}mV'
+                      : 'Max\n-',
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: Colors.white70),
@@ -762,12 +753,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
   }
 
   // Builds the temperature information card.
-  Widget _buildTemperatureCard(
-    BuildContext context,
-    String status,
-    double minValue,
-    double maxValue,
-  ) {
+  Widget _buildTemperatureCard(BuildContext context) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -785,7 +771,12 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               children: [
                 Icon(Icons.thermostat, color: Colors.green),
                 const SizedBox(width: 4),
-                Text(status, style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  _batteryData!.bmsMode != 7
+                      ? (_batteryData?.temperatureStatusString ?? "Unknown")
+                      : '-',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -793,13 +784,17 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Min\n${minValue.toStringAsFixed(1)}°C',
+                  _batteryData!.bmsMode != 7
+                      ? 'Min\n${_batteryData!.batteryMinTempC.toStringAsFixed(1)}°C'
+                      : 'Min\n-',
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Text(
-                  'Max\n${maxValue.toStringAsFixed(1)}°C',
+                  _batteryData!.bmsMode != 7
+                      ? 'Max\n${_batteryData!.batteryMaxTempC.toStringAsFixed(1)}°C'
+                      : 'Max\n-',
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: Colors.white70),
@@ -814,12 +809,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
   }
 
   // Builds the charging information card.
-  Widget _buildChargingInfoCard(
-    BuildContext context,
-    String chargeStatus,
-    double estimatedPower,
-    double estimatedCurrent,
-  ) {
+  Widget _buildChargingInfoCard(BuildContext context) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -838,7 +828,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      chargeStatus,
+                      _batteryData?.bmsModeString ?? 'N/A',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],
@@ -859,13 +849,17 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '${estimatedPower.toStringAsFixed(1)}kW',
+                      _batteryData!.bmsMode != 7
+                          ? '${_batteryData?.maxChargePowerKw?.toStringAsFixed(1) ?? 'N/A'}kW'
+                          : '-',
                       style: Theme.of(
                         context,
                       ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                     ),
                     Text(
-                      '${estimatedCurrent.toStringAsFixed(1)}A',
+                      _batteryData!.bmsMode != 7
+                          ? '${_batteryData?.maxChargeCurrentAmpCalculated?.toStringAsFixed(1) ?? 'N/A'}A'
+                          : '-',
                       style: Theme.of(
                         context,
                       ).textTheme.bodySmall?.copyWith(color: Colors.white70),
@@ -881,12 +875,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
   }
 
   // Builds the battery heater information card.
-  Widget _buildBatteryHeaterCard(
-    BuildContext context,
-    String status,
-    int duty,
-    int requested,
-  ) {
+  Widget _buildBatteryHeaterCard(BuildContext context) {
     return Card(
       // elevation: 0,
       surfaceTintColor: Colors.transparent,
@@ -906,7 +895,11 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      status,
+                      _batteryData!.bmsMode != 7
+                          ? (_batteryData?.batteryHeatingActive == true
+                              ? 'Active'
+                              : 'Not Active')
+                          : '-',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],
@@ -918,13 +911,17 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Heater\n$duty%',
+                  _batteryData!.bmsMode != 7
+                      ? 'Heater\n${_batteryData!.powerBatteryHeatingWattCalculated.toInt()}%'
+                      : 'Heater\n-',
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Text(
-                  'Coolant\n${_batteryData!.coolantTemperatureCalculated.toStringAsFixed(0)}°C',
+                  _batteryData!.bmsMode != 7
+                      ? 'Coolant\n${_batteryData!.coolantTemperatureCalculated.toStringAsFixed(0)}°C'
+                      : 'Coolant\n-',
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: Colors.white70),

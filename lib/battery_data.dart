@@ -5,12 +5,13 @@ class BatteryData {
   final int bmsMode; // uint8_t
   final int bmsCurrent; // uint16_t, X - 16300
   final int bmsVoltage; // uint16_t, X * 2.5
+  final int bmsPackVoltage; // uint16_t, X * 0.0625
   final int maxChargePowerWatt; // uint16_t, X * 0.1
   final int maxChargeCurrentAmp; // uint16_t, X * 0.2
   final int batterySOC; // uint16_t, X * 0.05
   final int usableEnergyAmountWh; // uint16_t, X * 5
+  final int coolantTemperature;
   final int temperatureStatusCharge; // uint8_t
-  final int performanceIndexChargePeakTemperaturePercentage; // uint16_t, X * 0.2
   final int batteryMinTemp; // uint8_t, X * 0.5 - 40
   final int batteryMaxTemp; // uint8_t, X * 0.5 - 40
   final int cellVoltageMax; // uint16_t, X + 1000
@@ -23,12 +24,13 @@ class BatteryData {
     required this.bmsMode,
     required this.bmsCurrent,
     required this.bmsVoltage,
+    required this.bmsPackVoltage,
     required this.maxChargePowerWatt,
     required this.maxChargeCurrentAmp,
     required this.batterySOC,
     required this.usableEnergyAmountWh,
+    required this.coolantTemperature,
     required this.temperatureStatusCharge,
-    required this.performanceIndexChargePeakTemperaturePercentage,
     required this.batteryMinTemp,
     required this.batteryMaxTemp,
     required this.cellVoltageMax,
@@ -47,6 +49,8 @@ class BatteryData {
     offset += 2;
     final int bmsVoltage = byteData.getUint16(offset, Endian.little);
     offset += 2;
+    final int bmsPackVoltage = byteData.getUint16(offset, Endian.little);
+    offset += 2;
     final int maxChargePowerWatt = byteData.getUint16(offset, Endian.little);
     offset += 2;
     final int maxChargeCurrentAmp = byteData.getUint16(offset, Endian.little);
@@ -55,11 +59,10 @@ class BatteryData {
     offset += 2;
     final int usableEnergyAmountWh = byteData.getUint16(offset, Endian.little);
     offset += 2;
+    final int coolantTemperature = byteData.getUint8(offset);
+    offset += 1;
     final int temperatureStatusCharge = byteData.getUint8(offset);
     offset += 1;
-    final int performanceIndexChargePeakTemperaturePercentage =
-        byteData.getUint16(offset, Endian.little);
-    offset += 2;
     final int batteryMinTemp = byteData.getUint8(offset);
     offset += 1;
     final int batteryMaxTemp = byteData.getUint8(offset);
@@ -79,13 +82,13 @@ class BatteryData {
       bmsMode: bmsMode,
       bmsCurrent: bmsCurrent,
       bmsVoltage: bmsVoltage,
+      bmsPackVoltage: bmsPackVoltage,
       maxChargePowerWatt: maxChargePowerWatt,
       maxChargeCurrentAmp: maxChargeCurrentAmp,
       batterySOC: batterySOC,
       usableEnergyAmountWh: usableEnergyAmountWh,
+      coolantTemperature: coolantTemperature,
       temperatureStatusCharge: temperatureStatusCharge,
-      performanceIndexChargePeakTemperaturePercentage:
-          performanceIndexChargePeakTemperaturePercentage,
       batteryMinTemp: batteryMinTemp,
       batteryMaxTemp: batteryMaxTemp,
       cellVoltageMax: cellVoltageMax,
@@ -98,6 +101,10 @@ class BatteryData {
 
   double get instantaneousPower {
     return (bmsCurrent - 16300) * (bmsVoltage * 2.5) / -100;
+  }
+
+  double get packVoltage {
+    return bmsPackVoltage * 0.0625;
   }
 
   double get batterySOCPercentage {
@@ -114,6 +121,10 @@ class BatteryData {
 
   double get maxChargeCurrentAmpCalculated {
     return maxChargeCurrentAmp * 0.2;
+  }
+
+  double get coolantTemperatureCalculated {
+    return (coolantTemperature * 0.5) - 40;
   }
 
   int get powerBatteryHeatingWattCalculated {
@@ -173,9 +184,9 @@ class BatteryData {
   String get bmsModeString {
     switch (bmsMode) {
       case 0:
-        return 'Not ready';
+        return 'Inactive';
       case 1:
-        return 'Ready';
+        return 'Active';
       case 2:
         return 'Balancing';
       case 3:

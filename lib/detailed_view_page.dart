@@ -40,29 +40,32 @@ class DetailedViewPageState extends State<DetailedViewPage> {
   ScaffoldMessengerState? _scaffoldMessengerState;
 
   final String _serviceUuid = BleUuidParser.string(kServiceUuid);
-  final String _heatingCharacteristicUuid =
-      BleUuidParser.string(kHeatingCharacteristicUuid);
-  final String _manufacturerNameCharacteristicUuid =
-      BleUuidParser.string(kManufacturerNameCharacteristicUuid);
-  final String _batteryDataCharacteristicUuid =
-      BleUuidParser.string(kBatteryDataCharacteristicUuid);
+  final String _heatingCharacteristicUuid = BleUuidParser.string(
+    kHeatingCharacteristicUuid,
+  );
+  final String _manufacturerNameCharacteristicUuid = BleUuidParser.string(
+    kManufacturerNameCharacteristicUuid,
+  );
+  final String _batteryDataCharacteristicUuid = BleUuidParser.string(
+    kBatteryDataCharacteristicUuid,
+  );
 
-  late TextEditingController
-  _nameController;
+  late TextEditingController _nameController;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(
-      text: widget.deviceName,
-    );
+    _nameController = TextEditingController(text: widget.deviceName);
 
     if (widget.isDemoMode) {
       // Use static data in demo mode
       setState(() {
         Uint8List demoBytes = Uint8List.fromList(
           List.generate(kDemoBatteryDataHexString.length ~/ 2, (i) {
-            return int.parse(kDemoBatteryDataHexString.substring(i * 2, i * 2 + 2), radix: 16);
+            return int.parse(
+              kDemoBatteryDataHexString.substring(i * 2, i * 2 + 2),
+              radix: 16,
+            );
           }),
         );
         _batteryData = BatteryData.fromBytes(demoBytes);
@@ -142,19 +145,30 @@ class DetailedViewPageState extends State<DetailedViewPage> {
         _stopScan();
         _deviceFoundCompleter = Completer<void>();
 
-        _scanSubscription = UniversalBle.scanStream.listen((scanResult) {
-          if (scanResult.deviceId == widget.uuid) {
-            foundDevice = scanResult;
-            _stopScan();
-            if (!_deviceFoundCompleter!.isCompleted) {
-              _deviceFoundCompleter!.complete();
-            }
+        // Check system devices
+        List<BleDevice> sysDevices = await UniversalBle.getSystemDevices();
+        for (BleDevice dev in sysDevices) {
+          if (dev.deviceId == widget.uuid) {
+            _deviceFoundCompleter!.complete();
           }
-        });
+        }
 
-        await UniversalBle.startScan(
-          scanFilter: ScanFilter(withServices: [_serviceUuid]),
-        );
+        // Otherwise scan
+        if (!_deviceFoundCompleter!.isCompleted) {
+          _scanSubscription = UniversalBle.scanStream.listen((scanResult) {
+            if (scanResult.deviceId == widget.uuid) {
+              foundDevice = scanResult;
+              _stopScan();
+              if (!_deviceFoundCompleter!.isCompleted) {
+                _deviceFoundCompleter!.complete();
+              }
+            }
+          });
+
+          await UniversalBle.startScan(
+            scanFilter: ScanFilter(withServices: [_serviceUuid]),
+          );
+        }
 
         // Wait for the device to be found, with a timeout.
         await _deviceFoundCompleter!.future.timeout(
@@ -174,8 +188,11 @@ class DetailedViewPageState extends State<DetailedViewPage> {
       }
 
       // Connect to the device.
-      await UniversalBle.connect(widget.uuid,
-          connectionTimeout: const Duration(seconds: 10));
+      await UniversalBle.connect(
+        widget.uuid,
+        connectionTimeout: const Duration(seconds: 10),
+      );
+      await UniversalBle.requestMtu(widget.uuid, 512);
       if (!mounted) return;
       setState(() {
         _isConnected = true;
@@ -203,10 +220,10 @@ class DetailedViewPageState extends State<DetailedViewPage> {
 
       // Mark the device as paired after successful UniversalBle.pair
       if (!mounted) return;
-      await Provider.of<DeviceState>(context, listen: false).setSelectedDevice(
-        widget.uuid,
-        widget.deviceName ?? 'Unknown Device',
-      );
+      await Provider.of<DeviceState>(
+        context,
+        listen: false,
+      ).setSelectedDevice(widget.uuid, widget.deviceName ?? 'Unknown Device');
 
       final Uint8List value = await UniversalBle.read(
         widget.uuid,
@@ -224,9 +241,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
       setState(() {
         _isHeatingEnabled = value.isNotEmpty && value[0] == 0x01;
         try {
-          _nameController.text = utf8.decode(
-            manufacturerNameValue,
-          );
+          _nameController.text = utf8.decode(manufacturerNameValue);
         } catch (e) {
           // Ignore errors decoding the manufacturer name.
         }
@@ -234,13 +249,12 @@ class DetailedViewPageState extends State<DetailedViewPage> {
       });
 
       UniversalBle.onValueChange = _handleValueChange;
-      
+
       await _subscribeToBatteryData();
       await _subscribeToHeatingCharacteristic();
     } catch (e) {
       if (!mounted) return;
-      _showErrorSnackbar(
-          'Could not read or subscribe to characteristic. ($e)');
+      _showErrorSnackbar('Could not read or subscribe to characteristic. ($e)');
       await _disconnect();
       setState(() {
         _isLoadingCharacteristic = false;
@@ -254,7 +268,6 @@ class DetailedViewPageState extends State<DetailedViewPage> {
       _serviceUuid,
       _batteryDataCharacteristicUuid,
     );
-
   }
 
   Future<void> _subscribeToHeatingCharacteristic() async {
@@ -398,21 +411,31 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                             Text(
                               _batteryData != null
                                   ? (() {
-                                      double power = _batteryData!.instantaneousPower;
+                                      double power =
+                                          _batteryData!.instantaneousPower;
                                       if (power.abs() < 1000) {
                                         return power.toStringAsFixed(0);
                                       } else {
-                                        return (power / 1000).toStringAsFixed(2);
+                                        return (power / 1000).toStringAsFixed(
+                                          2,
+                                        );
                                       }
                                     })()
                                   : 'N/A',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 36),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.titleLarge?.copyWith(fontSize: 36),
                             ),
                             Text(
                               _batteryData != null
-                                  ? (_batteryData!.instantaneousPower.abs() < 1000 ? 'W' : 'kW')
+                                  ? (_batteryData!.instantaneousPower.abs() <
+                                            1000
+                                        ? 'W'
+                                        : 'kW')
                                   : '',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 20),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.copyWith(fontSize: 20),
                             ),
                           ],
                         ),
@@ -446,19 +469,28 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                                 width: 90,
                                 height: 90,
                                 child: CircularProgressIndicator(
-                                  value: _batteryData != null ? (_batteryData!.batterySOCPercentage) / 100 : 0.0,
+                                  value: _batteryData != null
+                                      ? (_batteryData!.batterySOCPercentage) /
+                                            100
+                                      : 0.0,
                                   strokeWidth: 8,
                                   backgroundColor: Colors.grey[800],
-                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                        Colors.green,
+                                      ),
                                 ),
                               ),
                               Text(
                                 _batteryData != null
                                     ? (_showUsableEnergy
-                                        ? '${(_batteryData!.usableEnergyAmountWhCalculated).toStringAsFixed(0)} Wh'
-                                        : '${(_batteryData!.batterySOCPercentage).toStringAsFixed(0)}%')
+                                          ? '${(_batteryData!.usableEnergyAmountWhCalculated).toStringAsFixed(0)} Wh'
+                                          : '${(_batteryData!.batterySOCPercentage).toStringAsFixed(0)}%')
                                     : 'N/A',
-                                style: _showUsableEnergy ? Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 12) : Theme.of(context).textTheme.titleLarge,
+                                style: _showUsableEnergy
+                                    ? Theme.of(context).textTheme.titleMedium
+                                          ?.copyWith(fontSize: 12)
+                                    : Theme.of(context).textTheme.titleLarge,
                               ),
                             ],
                           ),
@@ -489,7 +521,9 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                 Expanded(
                   child: _buildBatteryHeaterCard(
                     context,
-                    _batteryData?.batteryHeatingActive == true ? 'Active' : 'Not Active',
+                    _batteryData?.batteryHeatingActive == true
+                        ? 'Active'
+                        : 'Not Active',
                     _batteryData!.powerBatteryHeatingWattCalculated.toInt(),
                     _batteryData!.powerBatteryHeatingReqWattCalculated.toInt(),
                   ),
@@ -532,9 +566,12 @@ class DetailedViewPageState extends State<DetailedViewPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Center(
               child: ElevatedButton.icon(
-                onPressed: _isHeatingCharacteristicUpdating || _isLoadingCharacteristic
+                onPressed:
+                    _isHeatingCharacteristicUpdating || _isLoadingCharacteristic
                     ? null
-                    : () => _writeHeatingCharacteristic(!(_isHeatingEnabled ?? false)),
+                    : () => _writeHeatingCharacteristic(
+                        !(_isHeatingEnabled ?? false),
+                      ),
                 icon: const Icon(Icons.power_settings_new),
                 label: Text(
                   _isHeatingEnabled == true
@@ -542,9 +579,14 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                       : 'Enable Battery Heater',
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _isHeatingEnabled == true ? Colors.red : Colors.green,
+                  backgroundColor: _isHeatingEnabled == true
+                      ? Colors.red
+                      : Colors.green,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -586,12 +628,8 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               onPressed: _isLoadingCharacteristic
                   ? null
                   : _connectAndReadCharacteristic,
-              icon: const Icon(
-                Icons.bluetooth_connected,
-              ),
-              label: const Text(
-                'Reconnect',
-              ),
+              icon: const Icon(Icons.bluetooth_connected),
+              label: const Text('Reconnect'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blueAccent,
                 foregroundColor: Colors.white,
@@ -627,8 +665,9 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                 border: InputBorder.none,
                 hintStyle: TextStyle(color: Colors.white70),
               ),
-              style:
-                  Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontSize: 24),
               textAlign: TextAlign.center,
               onEditingComplete: () =>
                   _writeManufacturerName(_nameController.text),
@@ -657,8 +696,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
       ),
       body: Stack(
         children: [
-          if (_isConnected)
-            _buildMainContent(),
+          if (_isConnected) _buildMainContent(),
           if (_isLoadingCharacteristic || !_isConnected)
             Container(
               color: Theme.of(context).scaffoldBackgroundColor,
@@ -685,17 +723,14 @@ class DetailedViewPageState extends State<DetailedViewPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Cell voltage',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text('Pack voltage', style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 8),
             Row(
               children: [
                 const Icon(Icons.battery_full, color: Colors.green),
                 const SizedBox(width: 4),
                 Text(
-                  'Δ ${maxValue - minValue}mV',
+                  '${_batteryData!.packVoltage.toStringAsFixed(2)}V',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
@@ -707,11 +742,15 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               children: [
                 Text(
                   'Min\n${minValue}mV',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Text(
                   'Max\n${maxValue}mV',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                   textAlign: TextAlign.right,
                 ),
               ],
@@ -746,10 +785,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               children: [
                 Icon(Icons.thermostat, color: Colors.green),
                 const SizedBox(width: 4),
-                Text(
-                  status,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(status, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 8),
@@ -758,11 +794,15 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               children: [
                 Text(
                   'Min\n${minValue.toStringAsFixed(1)}°C',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Text(
                   'Max\n${maxValue.toStringAsFixed(1)}°C',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                   textAlign: TextAlign.right,
                 ),
               ],
@@ -788,10 +828,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'BMS',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text('BMS', style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -803,7 +840,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                     Text(
                       chargeStatus,
                       style: Theme.of(context).textTheme.titleMedium,
-                    )
+                    ),
                   ],
                 ),
               ],
@@ -814,18 +851,24 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               children: [
                 Text(
                   'Charging estimate',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       '${estimatedPower.toStringAsFixed(1)}kW',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                     ),
                     Text(
                       '${estimatedCurrent.toStringAsFixed(1)}A',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                     ),
                   ],
                 ),
@@ -853,10 +896,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Battery Heater',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text('Thermals', style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -868,7 +908,7 @@ class DetailedViewPageState extends State<DetailedViewPage> {
                     Text(
                       status,
                       style: Theme.of(context).textTheme.titleMedium,
-                    )
+                    ),
                   ],
                 ),
               ],
@@ -878,12 +918,16 @@ class DetailedViewPageState extends State<DetailedViewPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Duty\n$duty%',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  'Heater\n$duty%',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                 ),
                 Text(
-                  'Requested\n$requested%',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  'Coolant\n${_batteryData!.coolantTemperatureCalculated.toStringAsFixed(0)}°C',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.white70),
                   textAlign: TextAlign.right,
                 ),
               ],

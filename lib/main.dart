@@ -120,21 +120,13 @@ class MyApp extends StatelessWidget {
       ),
       home: Consumer<DeviceState>(
         builder: (context, deviceState, child) {
-          if (deviceState.selectedDeviceId == null && !deviceState.isDeviceSelected) {
-            // If no device is selected and not loading, show DeviceSelectionPage
+          if (!deviceState.isDeviceSelected) {
             return DeviceSelectionPage();
-          } else if (deviceState.selectedDeviceId != null) {
+          } else {
             return DetailedViewPage(
               uuid: deviceState.selectedDeviceId!,
               deviceName: deviceState.selectedDeviceName,
               isDemoMode: false,
-            );
-          } else {
-            // Show a loading indicator while the device state is being loaded
-            return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
             );
           }
         },
@@ -142,4 +134,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

@@ -2,6 +2,8 @@ import 'dart:math';
 import 'dart:typed_data';
 
 class BatteryData {
+  final int dataVersion; // uint8_t
+  final int dataAge; // uint32_t
   final int bmsMode; // uint8_t
   final int bmsCurrent; // uint16_t, X - 16300
   final int bmsVoltage; // uint16_t, X * 2.5
@@ -21,6 +23,8 @@ class BatteryData {
   final int powerBatteryHeatingReqWatt; // uint8_t
 
   BatteryData({
+    required this.dataVersion,
+    required this.dataAge,
     required this.bmsMode,
     required this.bmsCurrent,
     required this.bmsVoltage,
@@ -43,6 +47,10 @@ class BatteryData {
   factory BatteryData.fromBytes(Uint8List bytes) {
     final ByteData byteData = ByteData.sublistView(bytes);
     int offset = 0;
+    final int dataVersion = byteData.getUint8(offset);
+    offset += 1;
+    final int dataAge = byteData.getUint32(offset, Endian.little);
+    offset += 4;
     final int bmsMode = byteData.getUint8(offset);
     offset += 1;
     final int bmsCurrent = byteData.getUint16(offset, Endian.little);
@@ -79,6 +87,8 @@ class BatteryData {
     offset += 1;
 
     return BatteryData(
+      dataAge: dataAge,
+      dataVersion: dataVersion,
       bmsMode: bmsMode,
       bmsCurrent: bmsCurrent,
       bmsVoltage: bmsVoltage,

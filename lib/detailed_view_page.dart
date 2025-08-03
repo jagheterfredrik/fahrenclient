@@ -386,6 +386,26 @@ class DetailedViewPageState extends State<DetailedViewPage>
     }
   }
 
+  String _formatDuration(int seconds) {
+    if (seconds <= 1) {
+      return 'Live Data';
+    } else if (seconds < 60) {
+      return 'Data from $seconds second${seconds == 1 ? '' : 's'} ago';
+    } else if (seconds < 3600) {
+      int minutes = seconds ~/ 60;
+      return 'Data from $minutes minute${minutes == 1 ? '' : 's'} ago';
+    } else if (seconds < 86400) {
+      int hours = seconds ~/ 3600;
+      return 'Data from $hours hour${hours == 1 ? '' : 's'} ago';
+    } else if (seconds > 0xffffff00) {
+      return 'No data received';
+    } else {
+      int days = seconds ~/ 86400;
+      int hours = (seconds % 86400) ~/ 3600;
+      return 'Data from $days day${days == 1 ? '' : 's'}, $hours hour${hours == 1 ? '' : 's'} ago';
+    }
+  }
+
   Widget _buildMainContent() {
     if (_batteryData == null) {
       return const Center(
@@ -551,41 +571,6 @@ class DetailedViewPageState extends State<DetailedViewPage>
             ),
           ),
           const SizedBox(height: 14),
-
-          // "Enable Battery Heater" button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Center(
-              child: ElevatedButton.icon(
-                onPressed:
-                    _isHeatingCharacteristicUpdating || _isLoadingCharacteristic
-                    ? null
-                    : () => _writeHeatingCharacteristic(
-                        !(_isHeatingEnabled ?? false),
-                      ),
-                icon: const Icon(Icons.power_settings_new),
-                label: Text(
-                  _isHeatingEnabled == true
-                      ? 'Disable Battery Heater'
-                      : 'Enable Battery Heater',
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isHeatingEnabled == true
-                      ? Colors.red
-                      : Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 15,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  textStyle: const TextStyle(fontSize: 18),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -685,13 +670,83 @@ class DetailedViewPageState extends State<DetailedViewPage>
         ),
         elevation: 0,
       ),
-      body: Stack(
+      body: Column(
         children: [
-          if (_isConnected) _buildMainContent(),
-          if (_isLoadingCharacteristic || !_isConnected)
-            Container(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: _buildStatusScreens(),
+          Expanded(
+            child: Stack(
+              children: [
+                if (_isConnected) _buildMainContent(),
+                if (_isLoadingCharacteristic || !_isConnected)
+                  Container(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    child: _buildStatusScreens(),
+                  ),
+              ],
+            ),
+          ),
+          if (_isConnected)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              child: Center(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    if (_isHeatingCharacteristicUpdating) {
+                      _showErrorSnackbar(
+                          'Heating request already in progress.');
+                    } else if (_batteryData != null &&
+                        (_batteryData!.bmsMode == 6)) {
+                      _showErrorSnackbar(
+                          'Heating cannot be requested while the car is DC charging.');
+                    } else if (_batteryData != null &&
+                        (_batteryData!.bmsMode != 1 ||
+                        _batteryData!.dataAge > 5)) {
+                      _showErrorSnackbar(
+                          'Heating can only be requested with the car powered on.');
+                    } else {
+                      _writeHeatingCharacteristic(!(_isHeatingEnabled ?? false));
+                    }
+                  },
+                  icon: const Icon(Icons.power_settings_new),
+                  label: Text(
+                    _isHeatingEnabled == true
+                        ? 'Disable Battery Heater'
+                        : 'Enable Battery Heater',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: (_isHeatingCharacteristicUpdating ||
+                            _isLoadingCharacteristic ||
+                            (_batteryData != null &&
+                                _batteryData!.bmsMode != 1) ||
+                            (_batteryData != null && _batteryData!.dataAge > 5))
+                        ? Theme.of(context).disabledColor
+                        : (_isHeatingEnabled == true
+                            ? Colors.red
+                            : Colors.green),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 15,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    textStyle: const TextStyle(fontSize: 18),
+                  ),
+                ),
+              ),
+            ),
+          if (_isConnected && _batteryData != null)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: Text(
+                  _formatDuration(_batteryData!.dataAge),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
+              ),
             ),
         ],
       ),
@@ -850,7 +905,7 @@ class DetailedViewPageState extends State<DetailedViewPage>
                   children: [
                     Text(
                       _batteryData!.bmsMode != 7
-                          ? '${_batteryData?.maxChargePowerKw?.toStringAsFixed(1) ?? 'N/A'}kW'
+                          ? '${_batteryData?.maxChargePowerKw.toStringAsFixed(1) ?? 'N/A'}kW'
                           : '-',
                       style: Theme.of(
                         context,
@@ -858,7 +913,7 @@ class DetailedViewPageState extends State<DetailedViewPage>
                     ),
                     Text(
                       _batteryData!.bmsMode != 7
-                          ? '${_batteryData?.maxChargeCurrentAmpCalculated?.toStringAsFixed(1) ?? 'N/A'}A'
+                          ? '${_batteryData?.maxChargeCurrentAmpCalculated.toStringAsFixed(1) ?? 'N/A'}A'
                           : '-',
                       style: Theme.of(
                         context,
